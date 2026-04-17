@@ -79,7 +79,8 @@ sycamore/
 │   ├── PROBLEM.md            the worktrial prompt
 │   ├── RESPONSE.md           direct point-by-point response to PROBLEM.md
 │   ├── DESIGN.md             system design (technical)
-│   └── RESULTS.md            Phase B results and failure-mode analysis
+│   ├── RESULTS.md            Phase A/B/C results and failure-mode analysis
+│   └── PRESENTATION.md       slide-by-slide deck with speaker notes
 ├── harness/                  the code
 │   ├── loop.py               orchestrator and CLI
 │   ├── coder.py              coder agent (Claude with Read/Edit/Bash/submit_fix)
