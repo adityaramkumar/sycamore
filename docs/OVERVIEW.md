@@ -96,19 +96,29 @@ features didn't matter. That's it.
 
 ## What happened (our results)
 
-We ran the two versions on 5 bugs, in parallel (both versions at
-the same time).
+We ran four phases. Each one taught us something and often uncovered
+a new bug in our own system.
 
-- **Both versions fixed all 5 bugs** (100% test pass rate in both).
-- The Full version did it **slightly faster** on average (1.2 rounds
-  vs 1.4 rounds). Small signal, but real.
-- **Biggest surprise**: the Reviewer was the problem. 7 out of 15
-  times the Coder wrote a fix that actually worked, the Reviewer
-  still rejected it and asked for more changes. The Coder was fine.
-  The Reviewer was a nitpicker.
+- **Phase A (pilot, 3 bugs)**: mostly verified the pipeline works.
+  Caught two bugs in our system: the Coder was cheating with shell
+  commands, and our metrics were miscounting empty rounds.
+- **Phase B (5 bugs, parallel)**: both versions fixed all 5 bugs
+  (100% test pass rate). Biggest surprise: the Reviewer was too
+  picky. 7 out of 15 times the Coder wrote a working fix, the
+  Reviewer still rejected it.
+- **Phase C (2 bugs, post-fix)**: we made the Coder write tests
+  as part of its fix. Reviewer recall went from 50% to 66.7%.
+- **Phase D (4 bugs, sequential)**: first run that tested whether
+  memory actually accumulates. Memory did help. But we also found
+  a new bug: sometimes the Coder writes a regression test that
+  *fails on its own fix*, and the Reviewer approves it anyway
+  because the Reviewer reads the code but doesn't run it.
 
-So the main takeaway was "our Reviewer is grumpy, not our Coder is
-dumb."
+So the story goes: the Coder was fine, then the Reviewer was the
+problem, then we fixed the Reviewer's over-asking by making the
+Coder write tests, then found out sometimes the Coder's tests are
+broken and the Reviewer can't tell. Each fix makes the next problem
+visible, which is basically how engineering goes.
 
 ## Stuff we fixed along the way
 
@@ -129,12 +139,14 @@ Some silly bugs showed up during testing that we had to hunt down:
 
 With 2 more weeks:
 
-- Run the helpers in a specific *order* (not all at once) so the
-  memory actually gets used across multiple bugs. Parallel mode was
-  fast but lost that benefit.
-- Fix the Reviewer's "too grumpy" problem by rewriting its prompt.
-- Give the Reviewer access to git history too. It should know the
-  repo's style, not just judge in a vacuum.
+- **Top priority after Phase D**: check that the Coder's new tests
+  actually fail on the pre-fix code before we trust "oracle passed".
+  That would catch the broken-test loophole structurally.
+- Dedupe the Reviewer's calibration cases per issue so one hard bug
+  doesn't dominate its memory.
+- Try a value-function helper (AlphaGo-style) that estimates the
+  probability tests will pass, as a second opinion alongside the
+  Reviewer.
 
 With 2 more months:
 
@@ -147,8 +159,9 @@ With 2 more months:
 
 We built a way for an AI coder and an AI reviewer to teach each
 other using their past conversations, with a real test suite as the
-honest judge, and found out the coder is actually fine but the
-reviewer is too picky.
+honest judge. Each fix we made revealed the next defect: the coder
+writes tests now (good) but sometimes those tests are broken (new
+problem). The system is honest about itself, which is the point.
 
 ## Where to read next
 

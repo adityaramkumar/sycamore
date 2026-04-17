@@ -118,13 +118,14 @@ Checklist from PROBLEM.md:
 | Show measurable improvement on a metric I define | Partial. See caveat below. | [RESULTS.md](RESULTS.md) |
 | At least one anti-pathology mechanism | Done. Four of them: held-out split, alternating updates, reviewer audit and freeze, category-balanced retrieval. | `harness/scheduler.py` plus `harness/memory.py::CoderMemory.render_for` |
 
-**Caveat on "measurable improvement"**: Phase B was 5 issues across 2
-arms on Sonnet. Both arms achieved 100% `test_pass_rate`. History
-retrieval gave a small edge on `avg_rounds_to_oracle_pass` (1.2 vs
-1.4). The effect size is small and N=5 is below statistical power. A
-sequential within-arm run on more issues would be needed to claim a
-headline win, but the pipeline demonstrably works and the mechanisms
-fire correctly. See [RESULTS.md section "Findings"](RESULTS.md).
+**Caveat on "measurable improvement"**: we ran four phases.
+
+- Phase A (Haiku, 3 issues): pipeline integration test. `test_pass_rate` 66.7%, mostly caught bugs in our own system.
+- Phase B (Sonnet, 5 issues, parallel): headline 100% in both arms. `avg_rounds_to_oracle_pass` 1.2 vs 1.4 favoring FULL. Surfaced the reviewer-over-asking defect.
+- Phase C (Sonnet, 2 issues, post-fix parallel): confirmed the over-asking fix. `reviewer_recall` 50% to 66.7%.
+- Phase D (Sonnet, 4 issues, sequential): first run that exercised cross-issue memory accumulation. Showed memory helps the reviewer recalibrate (1224 got approved after 815's false-rejections loaded the reviewer's calibration cases). Also exposed a new defect: the coder sometimes writes regression tests that fail on its own fix, and the reviewer can't catch that because it doesn't run tests.
+
+Net: the mechanisms all work individually and we have clean metrics showing each one firing. The headline `test_pass_rate` moves both ways depending on which defects are active. Real measurable improvement within a single phase requires closing the broken-test loophole first. See [RESULTS.md](RESULTS.md) for the full per-phase breakdown.
 
 ---
 
@@ -186,14 +187,12 @@ Observed in Phase B results:
 
 **2 weeks:**
 
-- Sequential within-arm runs to actually measure memory accumulation.
-- Reviewer prompt tuning, plus split the `balance_gap` alert into
-  `reward_hacking` vs `reviewer_over_asking`.
-- Value-function reviewer (AlphaGo-style P(tests pass) head) as a
-  sanity check.
+- **Oracle-side verification that the coder's new tests actually fail on the pre-fix code.** Closes the "coder tests its own homework" loophole Phase D uncovered, where a coder that writes a broken regression test gets a false-approval because the reviewer reads statically and can't catch it. Roughly 30 lines in `harness/oracle.py`.
+- Value-function reviewer (AlphaGo-style P(tests pass) head) as a sanity check.
 - Best-of-N candidate diffs ranked by value and reviewer.
 - Curriculum ordering (easy to hard).
-- Extend history retrieval to the reviewer (git-blame context).
+- Reviewer git-blame context (`git blame` on the specific lines the coder modified, finer than the existing commit-level history block).
+- Dedupe calibration cases per issue so one hard issue doesn't dominate the reviewer's memory and trigger a premature freeze.
 
 **2 months:**
 
@@ -222,13 +221,17 @@ is documented as the 2-month direction.
 > - Git history
 > - Traces of each other
 
-The **coder** has git-history access via
-`harness/history.py::retrieve_similar_fixes`, hooked into its system
-prompt via `history_block`. Baseline-scoped and leakage-proof.
+Both the **coder** and the **reviewer** get git-history access via
+`harness/history.py::retrieve_similar_fixes`. Same pre-baseline
+commits are retrieved per issue and rendered into each agent's
+system prompt via `history_block`. Baseline-scoped and
+leakage-proof. The coder uses it to see how past fixes were shaped;
+the reviewer uses it to calibrate against what this repo typically
+ships.
 
-The **reviewer** does not yet have git-history access. That's the
-"extend history retrieval to the reviewer" item in the 2-week
-roadmap. Low-effort and high-signal, just didn't land in scope.
+Stretch direction: give the reviewer `git blame` on specifically
+the modified lines, not just the file-level commit list. That's
+still in the 2-week roadmap.
 
 Both agents have indirect access to each other's traces via distilled
 memory items. The reviewer's memory includes diff snippets from the

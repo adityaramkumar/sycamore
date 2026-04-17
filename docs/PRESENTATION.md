@@ -5,7 +5,7 @@ One slide per section. Each slide has:
 - **On slide**: bullets or a diagram to show.
 - **Say**: speaker notes in plain language. Audience is high schoolers who understand what agents and code review are.
 
-Suggested length: ~18 slides, roughly 15 to 20 minutes.
+Suggested length: 23 slides, roughly 18 to 22 minutes. Phase D at slide 17 is the most interesting moment. If you need to cut for time, slides 2+3 and 9+10 can each merge into one slide.
 
 ---
 
@@ -91,8 +91,12 @@ Every time the Coder and Reviewer talk, we save the full conversation to a file.
 ```
 coder prompt gets:
   + git history (similar past fixes from this repo)
-  + memory (distilled lessons from past traces)
+  + lessons notebook (distilled from past traces)
   + reviewer feedback (from the previous round)
+
+reviewer prompt gets:
+  + git history (same retrieval, so it knows the repo's norms)
+  + calibration notebook (when it was right, when it was wrong)
 
 every fix -> ORACLE (runs real tests, hidden from reviewer)
           -> REVIEWER (gives verdict + comments)
@@ -101,7 +105,7 @@ after the issue: distill the trace into memory updates
 ```
 
 **Say:**
-Five pieces. An Oracle that runs the real pytest tests and is the one thing nobody can fool. A git-history block so the Coder can see how past fixes in this repo looked. A small notebook for each agent with distilled lessons from past runs. A distillation step that fills those notebooks. And safety rules on top to prevent the two AIs from colluding.
+Five pieces. An Oracle that runs the real pytest tests and is the one thing nobody can fool. A git-history retrieval that shows both agents similar past fixes from this repo. A small notebook for each agent with distilled lessons. A distillation step that fills those notebooks after each issue. And safety rules on top to prevent the two AIs from colluding.
 
 ---
 
@@ -266,64 +270,91 @@ Phase C confirmed it. On issue 815, the Coder wrote the test up front, and the R
 
 ---
 
-## Slide 17. What worked
+## Slide 17. Phase D: sequential memory test (4 issues)
 
 **On slide:**
 
-- The Oracle (the big unlock). Without it we'd never have caught the Reviewer over-asking.
-- Git history for the Coder. Small efficiency win (~0.2 rounds faster to pass).
-- Coder writing tests alongside the fix. Directly fixed the over-asking.
-- Parallel worktrees. 3x speedup with no downside beyond memory accumulation.
-- Directional alerts. Makes the dashboard actually useful.
+- First run that actually tests whether memory accumulates across issues.
+- 4 issues in sequence, one FULL-arm process.
+- **Two new findings, one good, one bad.**
+
+Good:
+
+- Memory does accumulate and does help. After issue 815 produced three "I over-asked" calibration cases, the reviewer on the next issue (1224) had one of those cases in its prompt and approved round 1 correctly.
+- The reviewer freeze fired with the new directional reason `reviewer_over_asking` instead of the old misleading `reward_hacking`. The guardrail works.
+
+Bad:
+
+- **Test pass rate dropped from 100% to 50%.**
+- On two issues the Coder wrote a regression test that FAILED on its own fix. Oracle reported 217/218 and 153/154. Reviewer approved both anyway because the reviewer doesn't actually run the tests.
 
 **Say:**
-A few things that definitely worked. The Oracle was the biggest one, because it's what made the Reviewer's over-asking visible at all. Git history gave the Coder concrete examples from past fixes. Making the Coder write tests directly addressed the over-asking defect. And parallel worktrees are a cheap trick that cut our wall time by a lot.
+Phase D is the most interesting result we got because it made things worse. We finally ran sequentially so memory could accumulate. Memory did help the Reviewer recalibrate. But it also exposed a new problem: now that the Coder is writing tests, sometimes it writes a broken test. The Reviewer can't catch that because the Reviewer reads the diff statically and doesn't execute anything. So the Reviewer approved code where the Coder's own test was failing. That's exactly the "coder tests its own homework" loophole we could have predicted but hadn't seen in the data before.
 
 ---
 
-## Slide 18. What didn't work (first attempts)
+## Slide 18. What worked
 
 **On slide:**
 
-- First tried to tell the Reviewer "don't reject for missing tests". Overcorrected, swinging toward rubber-stamp. Reverted.
-- Anti-flailing rules tuned for Haiku broke Sonnet. Had to relax.
-- The Coder still sometimes skips the test on genuinely hard bugs. Open defect.
+- **The Oracle**. The single biggest unlock. Without it we'd never have caught either the Reviewer over-asking or the broken-test loophole.
+- **Git history for both agents**. Coder uses it to see past fix shapes. Reviewer uses it to know the repo's norms. Small efficiency win (~0.2 rounds faster to pass in Phase B).
+- **Memory accumulation** (Phase D). Reviewer actually recalibrated after seeing past false-rejections in its prompt.
+- **Coder writing tests alongside the fix** (Phase C). Took FULL/815 from 2 rounds to 1 round.
+- **Parallel worktrees**. 3x speedup with no downside beyond memory isolation.
+- **Directional alerts**. Phase D's freeze fired with the correct `reviewer_over_asking` reason, not a misleading label.
 
 **Say:**
-Plenty of stuff didn't work the first time. I initially tried to patch the over-asking from the Reviewer side, telling it to approve without tests. That was the wrong layer to fix. The Coder writing tests was the better answer. Also my early rules to prevent the Coder from looping on shell commands worked for Haiku but accidentally killed Sonnet, because Sonnet is more thorough and my threshold was too aggressive. Tuned that down.
+A lot worked. The Oracle is what made everything else measurable. Git history helped both agents. Memory really did accumulate when we ran sequentially. The Coder writing tests fixed the over-asking problem in Phase C. And the directional alerts correctly named every pathology we saw.
 
 ---
 
-## Slide 19. Safety rails that caught themselves
+## Slide 19. What didn't work (first attempts)
 
 **On slide:**
 
-- Reviewer Freeze: if the Reviewer misbehaves for N issues, we stop updating its notebook.
-- Held-out bugs: 7 of 25 are never used for training, only for grading.
-- Asymmetric information: Oracle never seen by Reviewer, Reviewer notebook never seen by Coder.
-- Post-Coder HEAD check: detect and revert if the Coder moved the repo off-baseline.
+- First tried to tell the Reviewer "don't reject for missing tests". Overcorrected toward rubber-stamp. Reverted.
+- Anti-flailing rules tuned for Haiku broke Sonnet's thorough exploration. Relaxed.
+- **Phase D revealed a new defect: the Coder sometimes writes broken regression tests.** Tests fail on its own fix. Reviewer can't catch that because it reads statically.
+- The Coder still sometimes skips the test on genuinely hard bugs (1240). Open.
 
 **Say:**
-I built a bunch of guardrails up front to prevent pathological dynamics. Several of them actually fired during development, which is how I know they work. The HEAD check caught the Coder sneakily running `git checkout master`. The empty-diff filter caught a metric bug. The directional alerts correctly labeled the over-asking problem after we split them.
+Plenty of stuff didn't work the first time. I initially patched the over-asking from the Reviewer side. Wrong layer. The Coder writing tests was the better answer. My early anti-flailing rules were tuned for Haiku and accidentally killed Sonnet's thorough exploration. And Phase D uncovered that the "Coder writes tests" fix introduced a brand-new problem: sometimes the test itself is broken, and the Reviewer approves the diff anyway because the Reviewer doesn't run code. That's the next thing to fix.
 
 ---
 
-## Slide 20. What's next
+## Slide 20. Safety rails that caught themselves
 
 **On slide:**
 
-- Sequential runs within an arm to test memory accumulation (what parallel mode couldn't test).
-- Tighten Coder prompt to force a test edit on hard bugs.
-- Give the Reviewer git-blame too (not just diffs).
-- Value-function head (AlphaGo-style "P(tests pass)" estimator).
+- **Reviewer Freeze** fired in Phase D after 815 with the correct directional reason `reviewer_over_asking(0.75-0.25>0.3)`.
+- **Held-out bugs**: 7 of 25 never feed distillation.
+- **Asymmetric information**: Oracle never seen by Reviewer, Reviewer notebook never seen by Coder. Verified by re-reading the loop code.
+- **Post-Coder HEAD check** caught the Coder sneakily running `git checkout master` in Phase A.
+- **Empty-diff exclusion** caught a metric-layer bug that was misattributing "Coder did nothing" to "Reviewer over-asked" in Phase A.
+
+**Say:**
+I built a bunch of guardrails up front to prevent pathological dynamics. Several of them actually fired during development, which is how I know they work. The HEAD check caught the Coder cheating. The empty-diff filter caught a real metric bug. Phase D's Reviewer Freeze triggered with the correctly-named directional reason after splitting the alerts. These are the kind of defenses that only earn their keep when they catch something, and they did.
+
+---
+
+## Slide 21. What's next
+
+**On slide:**
+
+- **Highest priority: Oracle-side verification that the Coder's new tests actually fail on the pre-fix code.** Closes the Phase D loophole directly. ~30 lines.
+- Tighten Coder prompt: "do not submit if your test is failing". Already in the prompt, make it louder.
+- Dedupe calibration cases per issue so one hard bug doesn't over-weight the Reviewer's memory.
+- Value-function head (AlphaGo-style P(tests pass) estimator).
+- Reviewer `git blame` on modified lines specifically.
 - Cross-repo: does this transfer to a different library?
 
 **Say:**
-Things I didn't have time for. Running sequentially within an arm would let me measure memory accumulation, which parallel mode washes out. A value function would be an AlphaGo-inspired second opinion alongside the Reviewer. And the big open question: does any of this learning transfer between repos, or is it all arrow-specific?
+The top item is specifically for the Phase D defect. If we run the Coder's own tests against the pre-fix code, we catch broken tests structurally. Thirty lines. Would close the loophole before any of the bigger ideas. Then the usual bigger stretches: a value function, cross-repo transfer, better retrieval. But the next commit is the oracle-side check.
 
 ---
 
-## Slide 21. Summary
+## Slide 22. Summary
 
 **On slide:**
 
@@ -338,7 +369,7 @@ The one-sentence version: we built a way for two AIs to teach each other while k
 
 ---
 
-## Slide 22. Thank you / questions
+## Slide 23. Thank you / questions
 
 **On slide:**
 
@@ -365,9 +396,18 @@ Useful pieces to have on hand if someone asks.
 - FULL: `test_pass_rate=100%`, `first_pass=100%`, `reviewer_recall=66.7%`, `balance_gap=33.3%`.
 - ABLATE: `test_pass_rate=50%` (1240 still fails without context).
 
+## Phase D raw numbers
+
+- 4 issues (1056, 815, 1224, 607) sequential, single FULL process, 22 min wall.
+- `test_pass_rate=50%` (2/4), `first_pass_test_pass_rate=50%`, `approval_rate=75%`.
+- `reviewer_precision=33.3%`, `reviewer_recall=25%`, `reviewer_fpr=100%`.
+- Reviewer frozen after issue 815 with reasons: `precision_below_floor(0.00<0.6)` and `reviewer_over_asking(0.75-0.25>0.3)`.
+- Coder memory ended with 1 lesson, reviewer memory with 3 false_rejection cases from 815.
+- New defect: on 1056 and 607 the coder wrote tests that failed on its own fix, and the reviewer approved anyway. Two `false_approval` events.
+
 ## Stability rules
 
-- Reviewer freeze: triggers if precision < 0.6, or approval rate is in [0, 0.05] or [0.95, 1], or balance gap > 0.30.
+- Reviewer freeze: triggers if precision < 0.6, approval rate hits saturation, or either directional balance-gap exceeds 0.30.
 - Held-out: 7 of 25 issues (default seed 42).
 - Alternating updates: odd training issue updates the Coder, even updates the Reviewer.
 - Category-balanced retrieval: always inject at least one memory bullet from a different category than the current issue.
@@ -376,5 +416,5 @@ Useful pieces to have on hand if someone asks.
 
 - `docs/OVERVIEW.md`: plain-language start-here doc.
 - `docs/DESIGN.md`: the technical design.
-- `docs/RESULTS.md`: Phase A, B, C writeups with all the numbers.
+- `docs/RESULTS.md`: Phase A, B, C, D writeups with all the numbers.
 - `docs/RESPONSE.md`: direct answer to the original worktrial prompt.

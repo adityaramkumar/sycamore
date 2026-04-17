@@ -15,7 +15,7 @@ Five pieces, plus guardrails to keep them honest.
 4. **A distillation step** ([harness/distill.py](../harness/distill.py)). After each issue, walks every round. Oracle-passing diffs produce coder lessons (one LLM call). Every round produces a reviewer calibration case (no LLM).
 5. **Stability guardrails and real metrics** ([harness/scheduler.py](../harness/scheduler.py), [harness/metrics.py](../harness/metrics.py)). A held-out split that never feeds distillation, alternating updates so the two agents never learn at the same time, and a reviewer audit that freezes the reviewer's notebook if it drifts. Headline metric is oracle-grounded `test_pass_rate`.
 
-We do **not** build: an AlphaGo-style value network, best-of-N candidate ranking, a curriculum, or reviewer-side git-history access. Those are future work.
+We do **not** build: an AlphaGo-style value network, best-of-N candidate ranking, a curriculum, or an oracle-side check that the coder's own added tests actually fail on the pre-fix code. Those are future work.
 
 ---
 
@@ -29,9 +29,9 @@ Three pieces working together.
 
 **1. Tests are the anchor.** arrow ships a pytest suite. After every coder submission we secretly run a slice of those tests and record pass or fail. The Reviewer never sees the test result. That secrecy is what stops it from collapsing into a test-runner. Tests are noisy in some ways (they don't catch every bug), but they don't lie about the bugs they do cover.
 
-**2. The coder sees two kinds of extra context; the reviewer sees one.**
+**2. Both agents get extra context. The coder gets git history plus a lessons notebook. The reviewer gets git history plus a calibration notebook.**
 
-- **Coder's git-history block**: up to 3 pre-baseline commits that touched the same files, with a diff excerpt on the top match. The arrow repo has about 800 commits before our baseline, which is a much richer source of concrete examples than waiting to accumulate our own traces. Safety is structural: we only `git log c9cecaf`, so the 25 eval fix commits are literally unreachable (verified 0 of 25 leaks).
+- **Git-history block** (both agents): up to 3 pre-baseline commits that touched the same files, with a diff excerpt on the top match. The arrow repo has about 800 commits before our baseline, which is a much richer source of concrete examples than waiting to accumulate our own traces. Safety is structural: we only `git log c9cecaf`, so the 25 eval fix commits are literally unreachable (verified 0 of 25 leaks). The coder uses this block to see how similar fixes were shaped. The reviewer uses it to see what kinds of fixes the repo typically ships (size, whether tests were added, style).
 - **Coder's notebook**: bullet-point "lessons learned" from past fixes that passed the tests. Tagged by bug category. Capped at about 8 per category.
 - **Reviewer's notebook**: examples of times it was right and times it was wrong, organized as a 2x2 win/loss table:
 
@@ -80,6 +80,7 @@ flowchart TB
     subgraph perIssue [Per-Issue Loop]
         Issue --> Coder
         GitHist[("Git history<br/>pre-baseline only")] -.->|"top-k similar commits"| Coder
+        GitHist -.->|"top-k similar commits"| Reviewer
         CoderMem[(Coder notebook)] -.->|inject by category| Coder
         Coder -->|diff| OracleNode[Oracle: pytest]
         Coder -->|diff| Reviewer
@@ -137,6 +138,7 @@ Evaluation: run the same issue stream with and without distillation (ablation). 
 
 - Value-function reviewer (AlphaGo-style `P(tests pass)` head).
 - Best-of-N candidate diffs ranked by value or reviewer.
-- Extending git-history access to the reviewer (git-blame context).
+- Oracle-side verification that the coder's own added tests fail on the pre-fix code and pass on the fix. Closes the "coder tests its own homework" loophole that Phase D exposed.
+- Extending the reviewer's git-history to include `git blame` on modified lines specifically, not just relevant commit list.
 - Cross-repo transfer.
 - Mutation testing as a second oracle.

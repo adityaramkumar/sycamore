@@ -107,10 +107,14 @@ Two options:
 
 ## Results one-liner
 
-Phase B, 5 issues across 2 arms (full context vs ablated), Sonnet, 10
-parallel workers, about 20 minutes wall time. Both arms hit 100%
-oracle-grounded `test_pass_rate`. Git-history retrieval edged
-`avg_rounds_to_oracle_pass` down from 1.4 to 1.2. The dominant signal
-was that **the reviewer is chronically over-asking**. 7 of 15 non-empty
-reviewer rounds rejected a diff the oracle had already passed. Full
-breakdown in [docs/RESULTS.md](docs/RESULTS.md).
+Four phases of runs. Phase B (parallel, 5 issues) hit 100%
+`test_pass_rate` in both arms with a small edge for git-history
+retrieval, and surfaced the Reviewer-over-asking defect. Phase C
+(post-fix, 2 issues) confirmed the fix: `reviewer_recall` improved
+from 50% to 66.7%. Phase D (sequential, 4 issues) was the first run
+that exercised cross-issue memory accumulation. Memory works in the
+expected direction (Reviewer recalibrated after seeing past
+false-rejections) but also exposed a new defect: the Coder
+sometimes writes regression tests that fail on its own fix, and the
+Reviewer can't catch that because it reads statically. Full
+per-phase breakdown in [docs/RESULTS.md](docs/RESULTS.md).
