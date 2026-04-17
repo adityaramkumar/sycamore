@@ -1,5 +1,5 @@
 """
-reviewer.py — Code diff reviewer using claude-agent-sdk.
+reviewer.py: Code diff reviewer using claude-agent-sdk.
 
 Uses ClaudeSDKClient with a custom submit_review MCP tool to get a structured
 approval decision from Claude.

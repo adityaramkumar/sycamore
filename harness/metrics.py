@@ -1,5 +1,5 @@
 """
-metrics.py — Compute eval metrics from a corpus of trace files.
+metrics.py: Compute eval metrics from a corpus of trace files.
 
 The headline metric is `test_pass_rate` (oracle-grounded). All others
 either decompose it per-agent (first-pass, rounds-to-pass, reviewer
@@ -9,7 +9,7 @@ gap, approval saturation alerts) per DESIGN.md section 8.
 Backward compatibility: traces written before the oracle was wired
 in (no `oracle` key per round) are treated as oracle-failed and
 flagged via per_round_oracle being uniformly False. This is a
-deliberate choice — pre-oracle approvals are not ground-truth-
+deliberate choice; pre-oracle approvals are not ground-truth-
 verified and should not inflate test_pass_rate.
 
 Reviewer 2x2 confusion table is computed per-round, not per-issue,
@@ -113,8 +113,8 @@ def _reviewer_confusion(traces: Iterable[IssueOutcome]) -> dict[str, int]:
 
     Empty-diff rounds (coder produced no changes) are EXCLUDED. The
     oracle trivially passes on a clean baseline tree, and the
-    reviewer trivially rejects "no changes were made" -- counting
-    this as a false rejection would falsely paint the reviewer as
+    reviewer trivially rejects "no changes were made". Counting this
+    as a false rejection would falsely paint the reviewer as
     over-asking when in fact it correctly rejected an empty submission.
     """
     cm = {"true_approval": 0, "true_rejection": 0, "false_approval": 0, "false_rejection": 0}

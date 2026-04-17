@@ -1,12 +1,12 @@
 """
-history.py — Retrieve relevant past commits from pre-baseline git log.
+history.py: Retrieve relevant past commits from pre-baseline git log.
 
 Gives the coder cheap access to the target repo's history of similar
 fixes without requiring any LLM call. Strictly bounded to commits at
 or before the pinned baseline, so our 25 eval issues' fix commits
 are invisible by construction (verified: 0/25 ancestors of c9cecaf).
 
-Motivation: the per-issue coder/reviewer memories are inductive —
+Motivation: the per-issue coder/reviewer memories are inductive.
 they accumulate only from traces we produce in our own loop. arrow
 has ~7 years / ~800 commits of pre-baseline history that are a much
 richer source of concrete fix patterns than our first few traces.
@@ -114,7 +114,7 @@ def _safe_paths(issue: dict, repo_abs: str) -> list[str]:
     """Return issue.files_changed entries that currently exist on disk.
 
     Uses `git ls-files` on the target path so we respect the state of
-    HEAD. Missing paths are silently skipped — they may not exist at
+    HEAD. Missing paths are silently skipped; they may not exist at
     baseline (new-style test file names for legacy commits, etc.).
     """
     candidates: list[str] = []

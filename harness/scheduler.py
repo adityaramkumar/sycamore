@@ -1,5 +1,5 @@
 """
-scheduler.py — Policy-level guardrails on top of the trace loop.
+scheduler.py: Policy-level guardrails on top of the trace loop.
 
 This module owns the *decisions* that are not algorithmic but
 political: who learns when, who gets evaluated against what, and when
@@ -10,8 +10,8 @@ Three responsibilities:
 
 1. Held-out split (DESIGN.md sec 5 & 6.3).
    `make_split(numbers, heldout_size, seed)` returns deterministic
-   (training, held_out) lists of issue numbers. Same seed -> same
-   split, always. Held-out issues are RUN but distillation is
+   (training, held_out) lists of issue numbers. Same seed gives the
+   same split, always. Held-out issues are RUN but distillation is
    suppressed so the headline metric stays uncontaminated.
 
 2. Alternating updates (DESIGN.md sec 4.3 / 5.3).
@@ -25,7 +25,7 @@ Three responsibilities:
    rate, and balance gap from a window of recent traces. If precision
    drops below the floor or approval rate saturates, we mark the
    reviewer FROZEN and stop updating its memory. Freezing is sticky
-   in the prototype — recovery is future work.
+   in the prototype; recovery is future work.
 """
 from __future__ import annotations
 
@@ -79,8 +79,8 @@ def schedule_for(
 
     Held-out issues update nothing.
     Training-stream issues alternate parity:
-      stream_index odd  -> update_coder
-      stream_index even -> update_reviewer (unless reviewer is frozen)
+      stream_index odd : update the coder
+      stream_index even: update the reviewer (unless it is frozen)
     """
     if held_out:
         return {"update_coder": False, "update_reviewer": False}

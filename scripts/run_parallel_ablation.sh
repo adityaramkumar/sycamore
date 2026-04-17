@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_parallel_ablation.sh — launch a parallel FULL-vs-ABLATE ablation.
+# run_parallel_ablation.sh: launch a parallel FULL-vs-ABLATE ablation.
 #
 # For each issue in $ISSUES, spawns one FULL-arm worker (memory on,
 # git-history retrieval on, distillation on) and one ABLATE-arm worker

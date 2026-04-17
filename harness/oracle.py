@@ -1,5 +1,5 @@
 """
-oracle.py — Run a targeted subset of arrow's pytest suite against the
+oracle.py: Run a targeted subset of arrow's pytest suite against the
 current working tree of the target repo, returning a structured result
 that the loop records as ground truth for the trace.
 
@@ -69,7 +69,7 @@ class OracleResult:
 
     Targeted slice (the issue-specific test files):
       targeted_files  Test files we asked pytest to run. ["tests/"] means
-                      fallback-to-full-suite — usually indicates the issue
+                      fallback-to-full-suite; usually indicates the issue
                       changed source files we have no test mapping for.
       n_tests / n_passed / n_failed / failing_tests
       elapsed_s       Wall time of the targeted slice.
@@ -225,7 +225,7 @@ def run(issue: dict, repo: str | None = None, timeout_s: int | None = None) -> O
     result, _ = _run_pytest(targets, repo_abs, timeout)
 
     # Skip broader check if the targeted slice already failed (no signal
-    # to gain — something's already broken, we know the diff is bad) OR
+    # to gain; something's already broken, we know the diff is bad) OR
     # if the targeted slice WAS the full tests/ directory (no point
     # running it twice) OR if broader check is disabled.
     if (

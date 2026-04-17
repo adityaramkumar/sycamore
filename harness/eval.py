@@ -1,5 +1,5 @@
 """
-eval.py — CLI wrapper over harness.metrics.
+eval.py: CLI wrapper over harness.metrics.
 
 Usage:
     python harness/eval.py ./traces

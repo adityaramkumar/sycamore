@@ -1,5 +1,5 @@
 """
-distill.py — Mine completed traces for memory updates.
+distill.py: Mine completed traces for memory updates.
 
 After each issue runs, this module decides what (if anything) to add
 to the coder's lesson store and the reviewer's calibration store.
@@ -117,7 +117,7 @@ def _build_reviewer_note(outcome: str, round_data: dict, oracle: dict) -> str:
 def _select_coder_lesson_round(trace: dict) -> dict | None:
     """Pick the best round to distill a coder lesson from.
 
-    Prefer round 1 (cleanest signal — coder solved it without reviewer
+    Prefer round 1 (cleanest signal; coder solved it without reviewer
     contamination). Otherwise the earliest oracle-passed round.
     """
     rounds = trace.get("comments_per_round") or []
@@ -147,8 +147,8 @@ async def _distill_coder_lessons_async(
                 "type": "array",
                 "items": {"type": "string"},
                 "description": (
-                    "Up to 2 single-sentence lessons, each <= 200 chars. Generalize -- "
-                    "do not include specific values from this issue."
+                    "Up to 2 single-sentence lessons, each <= 200 chars. Generalize. "
+                    "Do not include specific values from this issue."
                 ),
             }
         },
@@ -169,7 +169,7 @@ async def _distill_coder_lessons_async(
     system = (
         "You distill GENERALIZABLE engineering lessons from a successful bug fix. "
         "Each lesson must be ONE sentence, <=200 characters, focused on FILE "
-        "LOCATIONS, FUNCTION NAMES, or APPROACH -- never include the specific "
+        "LOCATIONS, FUNCTION NAMES, or APPROACH. Never include the specific "
         "values, dates, locales, or numbers from this issue. Aim for guidance "
         "that helps with FUTURE bugs in the same area. Output 1-2 lessons."
     )
@@ -200,7 +200,7 @@ async def _distill_coder_lessons_async(
                             pass  # tool body already captured args
                 elif isinstance(msg, ResultMessage):
                     break
-    except Exception as e:  # noqa: BLE001 — distillation is best-effort
+    except Exception as e:  # noqa: BLE001 - distillation is best-effort
         _log(f"distillation LLM call failed: {e!r}")
         return []
 

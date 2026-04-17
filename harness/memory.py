@@ -1,10 +1,10 @@
 """
-memory.py — JSON-backed bullet stores for the coder and reviewer agents.
+memory.py: JSON-backed bullet stores for the coder and reviewer agents.
 
 Two stores live under MEMORY_DIR (default ./memory/):
-  - coder_lessons.json    — capped, category-tagged "lessons learned"
+  - coder_lessons.json: capped, category-tagged "lessons learned"
                              populated only from oracle-passing traces
-  - reviewer_rubric.json  — calibration cases tagged by the 2x2
+  - reviewer_rubric.json: calibration cases tagged by the 2x2
                              win/loss outcome from DESIGN.md sec 4.2
 
 Design notes:
@@ -16,7 +16,7 @@ Design notes:
     with `created_at` as a tie-breaker so the freshest stay.
   * Atomic write via tempfile + rename so a crash mid-update never
     leaves a half-written JSON on disk.
-  * The store object itself is *not* multi-process safe — only one
+  * The store object itself is *not* multi-process safe; only one
     loop process should write at a time, which matches our usage.
 
 Categorization helper `categorize(issue)` does a coarse keyword

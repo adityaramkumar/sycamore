@@ -1,8 +1,8 @@
 """
-loop.py — Orchestrator: runs coder→reviewer loop per issue.
+loop.py: the orchestrator. Runs the per-issue coder, reviewer loop.
 
 All issues are evaluated against a single pinned baseline commit
-(data/issues.json → baseline_commit) that predates ALL 25 fixes.
+(the `baseline_commit` field in data/issues.json) that predates every fix.
 This ensures a consistent, reproducible eval environment.
 
 Usage:
@@ -119,7 +119,7 @@ def run_issue(
     use_history: bool = True,
 ) -> dict:
     """
-    Run the coder→reviewer loop for a single issue against the pinned baseline.
+    Run the coder, reviewer loop for a single issue against the pinned baseline.
     Returns trace dict.
 
     If coder_memory / reviewer_memory are provided, render their current
@@ -380,7 +380,7 @@ def main():
         print("ERROR: data/issues.json missing 'baseline_commit'. Add it first.")
         sys.exit(1)
 
-    print(f"Baseline: {baseline} — {data.get('baseline_note', '')}")
+    print(f"Baseline: {baseline} - {data.get('baseline_note', '')}")
 
     if args.issue:
         matching = [i for i in issues if i["number"] == args.issue]
@@ -417,7 +417,7 @@ def main():
         held_out_set = set(held_nums)
         print(
             f"Split (seed={args.seed}): training={len(train_nums)} issues, "
-            f"held-out={len(held_nums)} issues -> {sorted(held_nums)}"
+            f"held-out={len(held_nums)} issues: {sorted(held_nums)}"
         )
 
     coder_memory: "CoderMemory | None" = None

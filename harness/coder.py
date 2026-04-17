@@ -1,12 +1,12 @@
 """
-coder.py — Agentic coding loop using claude-agent-sdk.
+coder.py: Agentic coding loop using claude-agent-sdk.
 
 The agent runs inside the target repo directory, with access to native
 Read / Write / Edit / Bash tools (from Claude Code). A custom `submit_fix`
 MCP tool signals when the agent is satisfied with its changes.
 
 Auth: uses the system `claude` CLI (logged in via Claude Max on this machine).
-No ANTHROPIC_API_KEY needed — set CLI_PATH env var to override the binary path.
+No ANTHROPIC_API_KEY needed; set CLI_PATH env var to override the binary path.
 """
 import anyio
 import os
