@@ -21,10 +21,14 @@ try:
     from harness.coder import run_coder
     from harness.reviewer import run_reviewer
     from harness.oracle import run as run_oracle
+    from harness.memory import CoderMemory, ReviewerMemory, categorize
+    from harness.distill import update_from_trace
 except ImportError:
     from coder import run_coder  # type: ignore
     from reviewer import run_reviewer  # type: ignore
     from oracle import run as run_oracle  # type: ignore
+    from memory import CoderMemory, ReviewerMemory, categorize  # type: ignore
+    from distill import update_from_trace  # type: ignore
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "issues.json")
 TRACES_DIR = os.path.join(os.path.dirname(__file__), "..", "traces")
@@ -54,10 +58,21 @@ def git_reset_to_baseline(repo: str):
     subprocess.run(["git", "checkout", "."], cwd=repo, check=True, capture_output=True)
 
 
-def run_issue(issue: dict, baseline: str, max_rounds: int = 5) -> dict:
+def run_issue(
+    issue: dict,
+    baseline: str,
+    max_rounds: int = 5,
+    coder_memory: "CoderMemory | None" = None,
+    reviewer_memory: "ReviewerMemory | None" = None,
+) -> dict:
     """
     Run the coder→reviewer loop for a single issue against the pinned baseline.
     Returns trace dict.
+
+    If coder_memory / reviewer_memory are provided, render their current
+    contents into the agents' system prompts. The same memory blocks are
+    used for every round of this issue (we do not refresh mid-issue);
+    distillation happens only after the loop completes.
     """
     repo_abs = os.path.abspath(REPO)
 
@@ -76,6 +91,32 @@ def run_issue(issue: dict, baseline: str, max_rounds: int = 5) -> dict:
 
     extra_context = ""
 
+    # Render memory blocks once per issue. Same blocks used in every round.
+    coder_block = ""
+    coder_lesson_ids: list[str] = []
+    if coder_memory is not None:
+        category = categorize(issue)
+        coder_block, coder_lesson_ids = coder_memory.render_for(category)
+        if coder_block:
+            print(
+                f"  Coder memory: injecting {len(coder_lesson_ids)} lesson(s) "
+                f"(category={category})",
+                flush=True,
+            )
+
+    reviewer_block = ""
+    reviewer_case_ids: list[str] = []
+    if reviewer_memory is not None:
+        reviewer_block, reviewer_case_ids = reviewer_memory.render()
+        if reviewer_block:
+            print(
+                f"  Reviewer memory: injecting {len(reviewer_case_ids)} calibration case(s)",
+                flush=True,
+            )
+
+    trace["coder_lesson_ids"] = coder_lesson_ids
+    trace["reviewer_case_ids"] = reviewer_case_ids
+
     issue_start = time.time()
 
     for round_num in range(1, max_rounds + 1):
@@ -87,7 +128,7 @@ def run_issue(issue: dict, baseline: str, max_rounds: int = 5) -> dict:
         if round_num == 1:
             git_reset_to_baseline(repo_abs)
 
-        diff = run_coder(issue, extra_context=extra_context)
+        diff = run_coder(issue, extra_context=extra_context, memory_block=coder_block)
 
         # Oracle runs against the patched working tree BEFORE the reviewer.
         # Its result is recorded in the trace but never passed to the
@@ -103,7 +144,7 @@ def run_issue(issue: dict, baseline: str, max_rounds: int = 5) -> dict:
         )
 
         print(f"  [Round {round_num}] Running reviewer... ({len(diff)} chars in diff)", flush=True)
-        review = run_reviewer(issue, diff)
+        review = run_reviewer(issue, diff, memory_block=reviewer_block)
 
         trace["rounds"] = round_num
         trace["comments_per_round"].append({
@@ -167,6 +208,11 @@ def main():
     parser.add_argument("--issue", type=int, help="Run a single issue by number")
     parser.add_argument("--all", action="store_true", help="Run all issues")
     parser.add_argument("--max-rounds", type=int, default=5)
+    parser.add_argument(
+        "--ablate",
+        action="store_true",
+        help="Disable memory injection AND distillation. Use for the no-distillation baseline arm.",
+    )
     args = parser.parse_args()
 
     data = load_data()
@@ -189,11 +235,46 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    for issue in issues:
+    coder_memory: "CoderMemory | None" = None
+    reviewer_memory: "ReviewerMemory | None" = None
+    if args.ablate:
+        print("ABLATION MODE: memory injection and distillation disabled.")
+    else:
+        coder_memory = CoderMemory()
+        reviewer_memory = ReviewerMemory()
+        print(
+            f"Memory active: coder={len(coder_memory.all())} lessons, "
+            f"reviewer={len(reviewer_memory.all())} cases"
+        )
+
+    for stream_index, issue in enumerate(issues, start=1):
         print(f"\n=== Issue #{issue['number']}: {issue['title']} ===")
-        trace = run_issue(issue, baseline=baseline, max_rounds=args.max_rounds)
+        trace = run_issue(
+            issue,
+            baseline=baseline,
+            max_rounds=args.max_rounds,
+            coder_memory=coder_memory,
+            reviewer_memory=reviewer_memory,
+        )
         save_trace(trace)
-        print(f"  Done: {trace['rounds']} rounds, approved={trace['approved']}")
+        print(f"  Done: {trace['rounds']} rounds, approved={trace['approved']}, "
+              f"oracle_passed_final={trace['oracle_passed_final']}")
+
+        if not args.ablate:
+            # Guardrails (alternating schedule, held-out exclusion) are
+            # added in the next commit; for now we update both memories
+            # every issue. Distillation is best-effort - failures don't
+            # abort the run.
+            try:
+                update_from_trace(
+                    trace,
+                    issue,
+                    coder_memory=coder_memory,
+                    reviewer_memory=reviewer_memory,
+                    schedule={"update_coder": True, "update_reviewer": True},
+                )
+            except Exception as e:  # noqa: BLE001
+                print(f"  WARNING: distillation failed: {e!r}")
 
 
 if __name__ == "__main__":
