@@ -25,18 +25,27 @@ from claude_agent_sdk import (
 
 _CLAUDE_BIN = os.environ.get("CLI_PATH") or shutil.which("claude") or None
 
-SYSTEM = (
+SYSTEM_BASE = (
     "You are a strict code reviewer. Given a GitHub issue and a diff, decide whether "
     "the fix correctly addresses the issue. Check for: correctness, edge cases, test "
     "coverage, and code style. Call submit_review with your decision."
 )
 
 
+def _build_system_prompt(memory_block: str = "") -> str:
+    """Compose the reviewer system prompt, optionally with a calibration
+    block (win/loss exemplars) appended.
+    """
+    if not memory_block:
+        return SYSTEM_BASE
+    return f"{SYSTEM_BASE}\n\n{memory_block}"
+
+
 def _log(msg: str):
     print(f"    [reviewer] {msg}", flush=True)
 
 
-async def _run_reviewer_async(issue: dict, diff: str) -> dict:
+async def _run_reviewer_async(issue: dict, diff: str, memory_block: str = "") -> dict:
     if not diff.strip():
         _log("No diff to review, rejecting.")
         return {"approved": False, "comments": ["No changes were made."]}
@@ -81,7 +90,7 @@ async def _run_reviewer_async(issue: dict, diff: str) -> dict:
 
     options = ClaudeAgentOptions(
         model=model,
-        system_prompt=SYSTEM,
+        system_prompt=_build_system_prompt(memory_block),
         max_turns=5,
         allowed_tools=["mcp__review-tools__submit_review"],
         permission_mode="default",
@@ -111,9 +120,12 @@ async def _run_reviewer_async(issue: dict, diff: str) -> dict:
     return review_result
 
 
-def run_reviewer(issue: dict, diff: str) -> dict:
+def run_reviewer(issue: dict, diff: str, memory_block: str = "") -> dict:
     """
     Review a diff for a given issue.
-    Returns {"approved": bool, "comments": [str, ...]}
+    Returns {"approved": bool, "comments": [str, ...]}.
+
+    `memory_block` is an optional calibration preamble (win/loss
+    exemplars) injected into the system prompt by the loop layer.
     """
-    return anyio.run(_run_reviewer_async, issue, diff)
+    return anyio.run(_run_reviewer_async, issue, diff, memory_block)

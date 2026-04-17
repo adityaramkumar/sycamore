@@ -33,7 +33,7 @@ REPO = os.environ.get("TARGET_REPO_PATH", "./arrow")
 _CLAUDE_BIN = os.environ.get("CLI_PATH") or shutil.which("claude") or None
 
 
-def _build_system_prompt(extra_context: str = "") -> str:
+def _build_system_prompt(extra_context: str = "", memory_block: str = "") -> str:
     base = (
         "You are a coding agent fixing bugs in a Python project. "
         "Be efficient: read the relevant file, make the fix, run tests, call submit_fix.\n\n"
@@ -45,6 +45,10 @@ def _build_system_prompt(extra_context: str = "") -> str:
         "Do NOT explore the repo structure extensively. The bug is likely in "
         "arrow/arrow.py, arrow/locales.py, or arrow/parser.py."
     )
+    # Memory block (lessons learned from past traces) goes before the
+    # round-specific reviewer feedback so it serves as durable guidance.
+    if memory_block:
+        base += f"\n\n{memory_block}"
     if extra_context:
         base += f"\n\n{extra_context}"
     return base
@@ -54,7 +58,12 @@ def _log(msg: str):
     print(f"    [coder] {msg}", flush=True)
 
 
-async def _run_coder_async(issue: dict, extra_context: str = "", max_turns: int = 30) -> str:
+async def _run_coder_async(
+    issue: dict,
+    extra_context: str = "",
+    max_turns: int = 30,
+    memory_block: str = "",
+) -> str:
     """Async impl. Returns the git diff produced by the agent."""
 
     start = time.time()
@@ -87,7 +96,7 @@ async def _run_coder_async(issue: dict, extra_context: str = "", max_turns: int 
 
     options = ClaudeAgentOptions(
         model=model,
-        system_prompt=_build_system_prompt(extra_context),
+        system_prompt=_build_system_prompt(extra_context, memory_block),
         cwd=os.path.abspath(REPO),
         max_turns=max_turns,
         allowed_tools=["Read", "Write", "Edit", "Bash", "mcp__worktrial-tools__submit_fix"],
@@ -126,9 +135,18 @@ async def _run_coder_async(issue: dict, extra_context: str = "", max_turns: int 
     return diff_result.stdout
 
 
-def run_coder(issue: dict, extra_context: str = "", max_turns: int = 30) -> str:
+def run_coder(
+    issue: dict,
+    extra_context: str = "",
+    max_turns: int = 30,
+    memory_block: str = "",
+) -> str:
     """
     Run the coder agent on an issue.
     Returns the git diff string of all changes made.
+
+    `memory_block` is an optional preamble of distilled lessons from
+    past traces, injected into the system prompt by the loop layer.
+    The coder does not load memory itself - the loop owns that.
     """
-    return anyio.run(_run_coder_async, issue, extra_context, max_turns)
+    return anyio.run(_run_coder_async, issue, extra_context, max_turns, memory_block)
