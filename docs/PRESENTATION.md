@@ -7,7 +7,7 @@ One slide per section. Each slide has:
 - **Visual**: what to draw, screenshot, or chart. Most are doable with Google Slides shapes, Google Sheets charts, or a screenshot.
 - **Say**: speaker notes. Carry the content that isn't on the slide.
 
-23 slides, about 18 to 22 minutes. Slide 17 (Phase D) is your strongest moment; if you need to cut, merge 2+3 and 9+10.
+24 slides, about 20 to 25 minutes. Slide 18 (Phase D) is your strongest moment; if you need to cut, merge 2+3 and 10+11.
 
 Design principles used here:
 
@@ -153,7 +153,42 @@ The single most important piece. Tests don't lie. They just run and pass or fail
 
 ---
 
-## Slide 8. Experimental setup
+## Slide 8. What goes in the notebooks
+
+**On slide:**
+
+**After every bug, both notebooks get updated based on the Oracle's verdict.**
+
+**Coder's notebook** (lessons to try next time)
+
+- Only updated when Oracle says PASS. Reviewer approval alone does not count.
+- Contains 1 to 2 short lessons per bug.
+- Tagged by bug category; capped at about 8 per category.
+- Example: *"Russian plural bugs are usually in arrow/locales.py. Check the timeframes dict."*
+
+**Reviewer's notebook** (calibration cases)
+
+- Updated every round based on Oracle vs its own verdict.
+- Each entry is one of four types:
+  - WIN: I approved and tests passed.
+  - WIN: I rejected and tests failed.
+  - LOSS: I approved but tests failed (missed a bug).
+  - LOSS: I rejected but tests passed (too picky).
+- Example LOSS: *"I asked for more tests on a fix that already passed. Next time, don't."*
+
+**Visual:**
+Center of the slide: a simple "after each bug" arrow pointing to the right.
+Left side: a small box labeled "Completed trace + Oracle verdict".
+Right side: two stacked notebook icons. Top one labeled "Coder's notebook" with a sample bullet visible. Bottom one labeled "Reviewer's notebook" with a sample WIN entry and a sample LOSS entry visible.
+
+**Say:**
+After each bug finishes, we walk the trace and update both notebooks. Coder side: only learn from successes. If the Oracle said the fix passed, we ask a small LLM to boil that fix into one or two generalizable lessons and save them. If the Oracle said it failed, we don't save anything for the Coder. That's how we prevent the Coder from learning to please the Reviewer while writing broken code.
+
+Reviewer side: every round produces a calibration case. It's a 2 by 2 table. Two of the cases are wins (the Reviewer agreed with the Oracle) and two are losses (they disagreed). We store examples of each so next time the Reviewer is shown past wins and past losses right in its prompt. That's how it learns from its own mistakes.
+
+---
+
+## Slide 9. Experimental setup
 
 **On slide:**
 
@@ -173,7 +208,7 @@ Standard ablation study. Two versions of the system. One has all the features tu
 
 ---
 
-## Slide 9. Metrics: what we measure
+## Slide 10. Metrics: what we measure
 
 **On slide:**
 
@@ -192,7 +227,7 @@ The headline is oracle-grounded so the AIs can't inflate it. Precision and recal
 
 ---
 
-## Slide 10. Why this set is good
+## Slide 11. Why this set is good
 
 **On slide:**
 
@@ -208,7 +243,7 @@ A common trap in ML evals is measuring the wrong thing. If we'd used raw approva
 
 ---
 
-## Slide 11. How we parallelized
+## Slide 12. How we parallelized
 
 **On slide:**
 
@@ -226,7 +261,7 @@ Running 10 bugs one at a time takes about an hour. To speed that up I used git w
 
 ---
 
-## Slide 12. Phase A: integration test (Haiku)
+## Slide 13. Phase A: integration test (Haiku)
 
 **On slide:**
 
@@ -244,7 +279,7 @@ The first run was mostly about finding bugs in my own system, not bugs in arrow.
 
 ---
 
-## Slide 13. Phase B: the ablation
+## Slide 14. Phase B: the ablation
 
 **On slide:**
 
@@ -267,7 +302,7 @@ Phase B was the real measurement. Both arms fixed all 5 bugs, looked boring. But
 
 ---
 
-## Slide 14. One bug up close: issue 1240
+## Slide 15. One bug up close: issue 1240
 
 **On slide:**
 
@@ -287,7 +322,7 @@ This is the clearest example of the problem. The Coder wrote a fix. The Oracle s
 
 ---
 
-## Slide 15. The surprise: Reviewer is too picky
+## Slide 16. The surprise: Reviewer is too picky
 
 **On slide:**
 
@@ -310,7 +345,7 @@ The Reviewer is too picky. Not lazy, not dishonest. Nitpicky. It kept asking for
 
 ---
 
-## Slide 16. Phase C: fix the Coder, not the Reviewer
+## Slide 17. Phase C: fix the Coder, not the Reviewer
 
 **On slide:**
 
@@ -330,7 +365,7 @@ Instead of telling the Reviewer "approve without tests" (wrong layer), I changed
 
 ---
 
-## Slide 17. Phase D: the surprise that came back
+## Slide 18. Phase D: the surprise that came back
 
 **On slide:**
 
@@ -353,7 +388,7 @@ Phase D was the most interesting result because it made things worse. Memory acc
 
 ---
 
-## Slide 18. What worked
+## Slide 19. What worked
 
 **On slide:**
 
@@ -371,7 +406,7 @@ A lot worked. The Oracle is what made everything else measurable. Git history he
 
 ---
 
-## Slide 19. What didn't work the first time
+## Slide 20. What didn't work the first time
 
 **On slide:**
 
@@ -390,7 +425,7 @@ Plenty didn't work the first time. The "make the Reviewer less picky" approach s
 
 ---
 
-## Slide 20. Safety rails that caught themselves
+## Slide 21. Safety rails that caught themselves
 
 **On slide:**
 
@@ -408,7 +443,7 @@ I built a bunch of guardrails up front. Several fired during development, which 
 
 ---
 
-## Slide 21. What's next
+## Slide 22. What's next
 
 **On slide:**
 
@@ -427,7 +462,7 @@ The top item is specifically for the Phase D defect. If we run the Coder's own t
 
 ---
 
-## Slide 22. Summary
+## Slide 23. Summary
 
 **On slide:** *(big font, no bullets)*
 
@@ -443,7 +478,7 @@ The one-sentence version: we built a way for two AIs to teach each other, ground
 
 ---
 
-## Slide 23. Thank you
+## Slide 24. Thank you
 
 **On slide:**
 
