@@ -55,7 +55,10 @@ except ImportError:
     )
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "issues.json")
-TRACES_DIR = os.path.join(os.path.dirname(__file__), "..", "traces")
+TRACES_DIR = os.environ.get(
+    "TRACES_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "traces"),
+)
 REPO = os.environ.get("TARGET_REPO_PATH", "./arrow")
 
 
