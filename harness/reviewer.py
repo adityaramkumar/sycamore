@@ -25,29 +25,18 @@ from claude_agent_sdk import (
 
 _CLAUDE_BIN = os.environ.get("CLI_PATH") or shutil.which("claude") or None
 
-# Phase B showed the reviewer chronically over-asks: precision 100%,
-# recall 50-57%, with every rejection being of an oracle-passing diff.
-# The old prompt listed "correctness, edge cases, test coverage, code
-# style" with equal weight, which primed the model to reject any
-# correct fix that lacked new tests. This rewrite makes correctness
-# the primary criterion and explicitly tells the reviewer not to reject
-# for missing tests when the fix itself is right.
+# Balanced rubric: check correctness, edge cases, test coverage, code
+# style. Phase B showed the reviewer chronically over-asked for tests
+# because the old prompt primed it to reject any correct fix lacking
+# new test coverage. The fix to that defect is not to tell the
+# reviewer "approve without tests" (which would swing to rubber-stamp
+# territory); it's to make the coder write tests alongside the fix,
+# so the reviewer's rubric is satisfied up front. See coder.py.
 SYSTEM_BASE = (
     "You are a code reviewer. Given a GitHub issue and a diff, decide "
-    "whether the fix correctly addresses the issue.\n\n"
-    "PRIMARY CRITERION: correctness. Does the diff actually make the "
-    "bug go away? If yes, lean toward approve.\n\n"
-    "Secondary considerations (mention in comments but do NOT block "
-    "approval on these alone):\n"
-    "- edge cases the fix might miss\n"
-    "- consistency with the repo's existing style and patterns\n"
-    "- risk of regressions in adjacent code\n\n"
-    "TEST COVERAGE: do NOT reject a correct fix just for missing new "
-    "tests. Many valid bug fixes in this repo ship without new tests. "
-    "You may note that tests would be nice-to-have in your comments, "
-    "but if the fix is small, correct, and consistent with the repo's "
-    "patterns, approve it.\n\n"
-    "Call submit_review with your decision."
+    "whether the fix correctly addresses the issue. Check for: "
+    "correctness, edge cases, test coverage, and code style. Call "
+    "submit_review with your decision."
 )
 
 
