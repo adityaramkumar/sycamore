@@ -199,6 +199,70 @@ Still open:
 
 ---
 
+## Phase D (sequential within-arm, Sonnet, 4 issues)
+
+First run that actually tested memory accumulation. Single FULL-arm process, 4 issues (1056, 815, 1224, 607) in order, memory persists across issues, no parallelism. Skipped 1240 as a time risk. Compare to Phase B (parallel, cold memory) and Phase C (parallel, fix verification) on the same issues.
+
+### Headline
+
+| Metric | Phase B FULL | Phase D FULL (sequential) |
+|---|---|---|
+| `test_pass_rate` | 100% (on these 4 issues) | **50% (2/4)** |
+| `first_pass_test_pass_rate` | 80% | 50% |
+| `approval_rate` (issue-level) | 80% | 75% |
+| `reviewer_precision` | 100% | **33.3%** |
+| `reviewer_recall` | 50% | 25% |
+| `reviewer_fpr` | 0% | **100%** |
+| `balance_gap` | 50% | 16.7% |
+
+Phase D is WORSE than Phase B on the primary metric. This is the most interesting result we've gotten.
+
+### Per-issue breakdown
+
+| Issue | Result | What happened |
+|---|---|---|
+| **1056** (training #1) | approved R1, oracle FAILED (217/218) | Coder added a test alongside its fix. **The test failed on its own fix.** Reviewer approved the diff without noticing. `false_approval`. |
+| **815** (training #2) | rejected R1, R2, R3 all oracle-pass | Reviewer was very picky. Three rounds of valid fixes, all rejected for additional asks. Reviewer FROZEN after this issue with directional reason `reviewer_over_asking(0.75-0.25>0.3)`. |
+| **1224** (training #3) | approved R1, oracle PASS | Reviewer saw 1 calibration case from 815 in its prompt. Correctly approved. `true_approval`. |
+| **607** (training #4) | approved R1, oracle FAILED (153/154) | Same defect as 1056. Coder wrote a test that failed; reviewer didn't notice. `false_approval`. |
+
+### What Phase D taught us
+
+**1. Memory accumulation does work, in the right direction.** After 815 produced 3 `false_rejection` cases for the reviewer, issue 1224 was approved on round 1 and the reviewer was correctly more lenient. Reviewer got an applicable calibration case before judging. This is what memory was supposed to do.
+
+**2. The reviewer freeze fired correctly with the new directional reason.** After 815 the audit tripped `precision_below_floor` and `reviewer_over_asking(0.75-0.25>0.3)`. The split alert from commit `35d228a` labeled the pathology correctly instead of the old misleading `reward_hacking` label.
+
+**3. New defect exposed that Phase B/C didn't see: the coder writes tests that don't actually pass on its own fix.** On 1056 and 607, the coder added a regression test alongside the source edit. In both cases the oracle reported a single test failure (217/218 and 153/154 respectively). The coder's own new test was failing. The reviewer approved the diff anyway because **the reviewer only sees the diff, not the oracle output** (asymmetric information by design).
+
+This is exactly the "coder tests its own homework" loophole we discussed earlier, and Phase D is the first run where we saw it hit. Mechanics:
+
+- New coder prompt tells it to write a regression test.
+- Coder writes *a* test. Sometimes the test is right. Sometimes it's broken (wrong assertion, wrong expected value).
+- Oracle correctly reports "tests failed".
+- Reviewer looks at the diff. The diff looks reasonable. Reviewer approves.
+- Trace records: `approved=True, oracle=fail`. Metrics count this as `false_approval`. Headline `test_pass_rate` drops.
+
+The reviewer should have caught this, but:
+
+- It doesn't run the tests itself. It reads the diff statically.
+- A broken test case can look syntactically fine to a static reviewer. Only running it reveals the bug.
+- Reviewer memory from 815 was "over-asking, you're too picky, approve more". That lesson may have pushed it toward approving when it should have flagged the failing test.
+
+### Fix direction for the next iteration
+
+Two sharp fixes for this:
+
+1. **Verify the coder's new tests actually fail on the pre-fix code.** Before accepting `oracle.passed=True`, stash the coder's source fix but keep its test additions; run only the new tests; assert they fail on baseline; assert they pass on the fix. Roughly 30 lines in the oracle. Would close the "coder tests its own homework" loophole directly.
+2. **Tighten the coder's instruction**: don't just say "add a test", say "**after adding the test, run it with Bash and confirm it passes on your fix. Do not call submit_fix if your test is failing.**" The prompt already says this; making it more emphatic may help.
+
+Phase D also argues for tightening the reviewer memory distillation: storing 3 false_rejection cases from a single issue is a lot for N=1, and the freeze may have been premature (815 was hard and the reviewer might have been correct on some of those rejections in spirit, if not by oracle). Possible fix: dedupe calibration cases per issue.
+
+### One-sentence version
+
+Sequential mode showed memory does help the reviewer recalibrate in the expected direction, but also exposed that the new "coder writes tests" prompt introduces a real `false_approval` path when the coder's test is itself broken. Fix the test-verification step and the oracle-side check will close both of these together.
+
+---
+
 ## Metrics I chose and why
 
 Metric choice follows DESIGN.md section 8 and the empty-diff-exclusion fix from Phase A.
