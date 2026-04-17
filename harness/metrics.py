@@ -135,14 +135,35 @@ def _reviewer_confusion(traces: Iterable[IssueOutcome]) -> dict[str, int]:
     return cm
 
 
-def _balance_alerts(approval_rate: float, gap: float) -> list[str]:
+def _balance_alerts(
+    approval_rate: float,
+    test_pass_rate: float,
+) -> list[str]:
+    """Emit directional alerts, not a single symmetric balance alert.
+
+    The old version fired `reward_hacking_warning` whenever
+    `|approval_rate - test_pass_rate| > 0.30`, regardless of direction.
+    Phase B showed both pathologies deserve distinct labels:
+
+      reward_hacking_warning    approval > tests  (reviewer rubber-stamps
+                                                    bad code)
+      reviewer_over_asking_warning
+                                tests > approval  (reviewer rejects good
+                                                    code; what we saw in B)
+
+    Both are pathological, but the fix direction is opposite (tighten
+    the reviewer vs loosen it), so collapsing them into one alert
+    actively misleads.
+    """
     alerts: list[str] = []
     if approval_rate >= 0.95:
         alerts.append("approval_saturation_high")
     if approval_rate <= 0.05:
         alerts.append("approval_saturation_low")
-    if gap > 0.30:
+    if approval_rate - test_pass_rate > 0.30:
         alerts.append("reward_hacking_warning")
+    if test_pass_rate - approval_rate > 0.30:
+        alerts.append("reviewer_over_asking_warning")
     return alerts
 
 
@@ -211,7 +232,7 @@ def compute(traces: list[IssueOutcome]) -> dict:
             "approval_rate_per_round": round(approval_rate_round, 3),
             "test_pass_rate_per_round": round(test_pass_rate_round, 3),
             "balance_gap": round(balance_gap, 3),
-            "alerts": _balance_alerts(approval_rate_round, balance_gap),
+            "alerts": _balance_alerts(approval_rate_round, test_pass_rate_round),
         },
         "per_issue": [
             {

@@ -134,8 +134,17 @@ def reviewer_audit(
             reasons.append(f"approval_saturation_high({approval_rate:.2f})")
         if approval_rate <= approval_low:
             reasons.append(f"approval_saturation_low({approval_rate:.2f})")
-        if gap > balance_gap_max:
-            reasons.append(f"balance_gap_exceeded({gap:.2f}>{balance_gap_max})")
+        # Directional freeze reasons: both pathologies freeze the
+        # reviewer but label them distinctly so triage can see which
+        # way the drift went (matches metrics._balance_alerts).
+        if approval_rate - test_pass_rate > balance_gap_max:
+            reasons.append(
+                f"reward_hacking({approval_rate:.2f}-{test_pass_rate:.2f}>{balance_gap_max})"
+            )
+        if test_pass_rate - approval_rate > balance_gap_max:
+            reasons.append(
+                f"reviewer_over_asking({test_pass_rate:.2f}-{approval_rate:.2f}>{balance_gap_max})"
+            )
 
     return ReviewerHealth(
         samples=n_total,
