@@ -1,131 +1,110 @@
 # Co-Optimizing AI Coding and Review Agents
 
-A worktrial repo for designing and prototyping a system that co-optimizes AI coding and review agents through self-play on real historical bugs.
+A prototype that uses the interaction traces between an AI coding agent
+and an AI review agent to improve both over time, with guardrails
+against the usual self-play pathologies. Built against [arrow-py/arrow]'s
+real historical bug backlog (~800 pre-baseline commits, 25 curated
+post-baseline fixes pinned to commit `c9cecaf`).
 
-**Problem statement:** [PROBLEM.md](PROBLEM.md)
+The three-part worktrial prompt is in [docs/PROBLEM.md](docs/PROBLEM.md).
+Direct point-by-point response lives in [docs/RESPONSE.md](docs/RESPONSE.md).
+Design writeup in [docs/DESIGN.md](docs/DESIGN.md), results in
+[docs/RESULTS.md](docs/RESULTS.md).
 
-## What's Provided
+[arrow-py/arrow]: https://github.com/arrow-py/arrow
 
-### Target Repo
+## What this system does
 
-[arrow-py/arrow](https://github.com/arrow-py/arrow) -- a small Python date/time library (~2200 LOC). We've curated 25 confirmed historical bugs (humanize, locale, and parser issues) as the issue backlog. All issues are pinned to a single baseline commit (`c9cecaf`) that predates every fix.
+Per issue, it runs a coder → oracle → reviewer loop:
 
-### Starter Harness
+1. **Coder** reads the issue, gets (optionally) a block of similar past
+   commits from git history and distilled lessons from memory, then
+   writes a fix.
+2. **Oracle** runs a targeted slice of arrow's pytest suite (and a
+   broader regression check) against the patched tree. Its verdict is
+   the only ground-truth signal and is **hidden from the reviewer**.
+3. **Reviewer** reads the diff and either approves or returns
+   structured comments. Sees only the diff + its own rubric memory.
+4. If rejected, reviewer comments go back to the coder for another
+   round (up to `--max-rounds`).
+5. After the issue finishes, **distillation** updates the coder's
+   lesson memory (if the oracle passed) and the reviewer's calibration
+   memory (based on 2×2 agreement with the oracle).
 
-A minimal but functional coder-reviewer loop in `harness/`:
+On top of that, four stability guardrails: a held-out split that
+never feeds distillation, alternating coder/reviewer updates, a
+reviewer audit that freezes updates if precision collapses, and
+category-balanced retrieval to prevent topic collapse.
 
-| File | Purpose |
-|------|---------|
-| `coder.py` | Agentic coder (Claude + Read/Write/Edit/Bash tools) |
-| `reviewer.py` | Reviewer agent (approves or requests changes with structured comments) |
-| `loop.py` | Orchestration: reset repo -> code -> review -> repeat until approved or max rounds |
-| `eval.py` | Compute metrics from trace files |
-
-The harness is intentionally minimal. You can (and should) modify everything -- prompts, tools, loop logic, trace format, eval metrics, architecture.
-
-### Data
-
-`data/issues.json` contains the 25 issues with metadata:
-- `number`, `title`, `body_summary` -- issue context for the coder
-- `fix_commit` -- ground truth SHA (for evaluation only, do NOT pass to the coder)
-- `files_changed` -- which files were modified in the real fix
-
-Bug categories:
-- `humanize()` boundary/rounding bugs (6)
-- Missing locale timeframes -- week/quarter (7)
-- Locale pluralization errors (3)
-- Date parsing edge cases (6)
-- DST, range, escaping bugs (3)
-
-## Quick Start
+## Quick start
 
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Clone the target repo
 git clone https://github.com/arrow-py/arrow ./arrow
 
-# Run a single issue to see the loop in action
+# One issue, default settings
 python -m harness.loop --issue 1015
 
-# Run all 25 issues
+# A specific subset
+python -m harness.loop --issues 1056,815,1224 --max-rounds 3
+
+# All 25 issues with the held-out split
 python -m harness.loop --all
 
-# View metrics from traces
+# Metrics
 python harness/eval.py ./traces
+
+# Ablation baseline (no memory, no history retrieval)
+python -m harness.loop --all --ablate --no-history
+```
+
+Environment variables are documented in [.env.example](.env.example).
+Parallel ablation runs are wrapped in
+[`scripts/run_parallel_ablation.sh`](scripts/run_parallel_ablation.sh).
+
+## Layout
+
+```
+sycamore/
+├── README.md                 you are here
+├── requirements.txt
+├── .env.example              env-var reference
+├── data/
+│   └── issues.json           25 curated bugs + fix ground truth + baseline SHA
+├── docs/
+│   ├── PROBLEM.md            the worktrial prompt
+│   ├── RESPONSE.md           direct point-by-point response to PROBLEM.md
+│   ├── DESIGN.md             system design (high-schooler readable)
+│   └── RESULTS.md            Phase B results + failure-mode analysis
+├── harness/                  the code
+│   ├── loop.py               orchestrator + CLI
+│   ├── coder.py              coder agent (Claude + Read/Edit/Bash + submit_fix)
+│   ├── reviewer.py           reviewer agent (Claude + submit_review)
+│   ├── oracle.py             targeted pytest runner + broader regression check
+│   ├── memory.py             JSON-backed capped bullet stores for both agents
+│   ├── history.py            baseline-scoped git-log retrieval for the coder
+│   ├── distill.py            trace mining -> memory updates (2x2 win/loss)
+│   ├── scheduler.py          held-out split + alternating updates + audit/freeze
+│   ├── metrics.py            oracle-grounded scoreboard + balance monitor
+│   └── eval.py               thin CLI wrapper over metrics
+└── scripts/
+    └── run_parallel_ablation.sh
 ```
 
 ## Auth
 
-The harness uses the system `claude` CLI, authenticated via Claude Max. No API key needed. Set `CLI_PATH` env var to override the binary path.
+Two options:
+- **Claude Max via the `claude` CLI** (default). No extra config if you're
+  already logged in; set `CLI_PATH` if the binary isn't on `$PATH`.
+- **Anthropic API key**. Export `ANTHROPIC_API_KEY` and the SDK picks
+  it up. Required for higher concurrency / explicit model selection.
 
-## Structure
+## Results one-liner
 
-```
-worktrial-base/
-├── harness/
-│   ├── coder.py       # Agentic coder
-│   ├── reviewer.py    # Reviewer agent
-│   ├── loop.py        # Orchestration loop
-│   └── eval.py        # Metrics computation
-├── data/
-│   └── issues.json    # 25 curated bugs with ground truth
-├── traces/            # Per-issue JSON traces (created on first run)
-├── PROBLEM.md         # Full problem statement
-├── .env.example       # Environment variable template
-└── requirements.txt
-```
-
-## How It Works
-
-For each issue:
-
-1. **Reset** `arrow-py/arrow` to the pinned baseline commit
-2. **Coder** reads the issue, explores code, writes a fix, runs tests, submits
-3. **Reviewer** reads the diff, either approves or returns structured comments
-4. If not approved, reviewer comments are passed back to the coder for another round
-5. **Trace** saved to `traces/issue_<N>.json`
-
-This produces the interaction traces described in the problem statement:
-
-```
-Trace = {
-  issue,
-  [(pr_attempt_1, review_1), (pr_attempt_2, review_2), ...],
-}
-```
-
-## Starter Metrics
-
-`harness/eval.py` computes these from trace files:
-
-| Metric | Description |
-|--------|-------------|
-| `avg_rounds` | Average coder-reviewer rounds per issue (lower = better) |
-| `approval_rate` | Fraction of issues eventually approved |
-| `first_pass_rate` | Fraction approved on the first attempt |
-| `comment_addressal_rate` | In multi-round issues, did the coder change its approach? |
-
-These are a starting point. You should define additional metrics relevant to co-optimization.
-
----
-
-## Admin: Candidate Setup
-
-This repo is a [template repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-template-repository). To set up a candidate for the worktrial:
-
-```bash
-# Create a private repo for the candidate from the template
-gh api repos/sycamore-labs/worktrial-agents-base/generate \
-  -f owner=sycamore-labs \
-  -f name=worktrial-CANDIDATE_NAME \
-  -f private=true
-
-# Invite the candidate as a collaborator
-gh api repos/sycamore-labs/worktrial-CANDIDATE_NAME/collaborators/GITHUB_USERNAME \
-  -X PUT -f permission=push
-
-# After the worktrial, review their repo then clean up
-gh repo delete sycamore-labs/worktrial-CANDIDATE_NAME --yes
-```
+Phase B, 5 issues × 2 arms (full context vs ablated), Sonnet, 10
+parallel workers, ~20 min wall time: both arms hit 100% oracle-grounded
+`test_pass_rate`. Git-history retrieval edged `avg_rounds_to_oracle_pass`
+down from 1.4 to 1.2. The dominant signal was that **the reviewer is
+chronically over-asking** — 7 of 15 non-empty reviewer rounds rejected
+a diff the oracle had already passed. Full breakdown in
+[docs/RESULTS.md](docs/RESULTS.md).

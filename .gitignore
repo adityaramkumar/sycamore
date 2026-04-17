@@ -3,6 +3,13 @@ __pycache__/
 *.pyo
 .venv/
 .env
+
+# Target repo clone + git-worktree directories for parallel runs
 arrow/
+arrow-*/
+
+# Per-run artifacts: traces and agent memories. Both plain + parallel variants.
 traces/
+traces-*/
 memory/
+memory-*/
