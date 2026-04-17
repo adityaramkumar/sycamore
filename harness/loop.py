@@ -23,12 +23,26 @@ try:
     from harness.oracle import run as run_oracle
     from harness.memory import CoderMemory, ReviewerMemory, categorize
     from harness.distill import update_from_trace
+    from harness.scheduler import (
+        DEFAULT_HELDOUT_SIZE,
+        DEFAULT_SEED,
+        make_split,
+        reviewer_audit,
+        schedule_for,
+    )
 except ImportError:
     from coder import run_coder  # type: ignore
     from reviewer import run_reviewer  # type: ignore
     from oracle import run as run_oracle  # type: ignore
     from memory import CoderMemory, ReviewerMemory, categorize  # type: ignore
     from distill import update_from_trace  # type: ignore
+    from scheduler import (  # type: ignore
+        DEFAULT_HELDOUT_SIZE,
+        DEFAULT_SEED,
+        make_split,
+        reviewer_audit,
+        schedule_for,
+    )
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "issues.json")
 TRACES_DIR = os.path.join(os.path.dirname(__file__), "..", "traces")
@@ -213,6 +227,30 @@ def main():
         action="store_true",
         help="Disable memory injection AND distillation. Use for the no-distillation baseline arm.",
     )
+    parser.add_argument(
+        "--heldout-size",
+        type=int,
+        default=DEFAULT_HELDOUT_SIZE,
+        help=f"Number of issues to reserve as held-out eval (default {DEFAULT_HELDOUT_SIZE}). "
+             "Held-out issues are still RUN but contribute no distillation.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=DEFAULT_SEED,
+        help=f"Seed for the deterministic train/held-out split (default {DEFAULT_SEED}).",
+    )
+    parser.add_argument(
+        "--no-heldout",
+        action="store_true",
+        help="Treat every issue as training. Useful for --issue mode and small ablations.",
+    )
+    parser.add_argument(
+        "--audit-window",
+        type=int,
+        default=6,
+        help="How many recent training-stream traces to use for the reviewer audit (default 6).",
+    )
     args = parser.parse_args()
 
     data = load_data()
@@ -235,6 +273,20 @@ def main():
         parser.print_help()
         sys.exit(1)
 
+    # Held-out split (DESIGN.md sec 5 / 6.3). Single-issue runs and
+    # --no-heldout disable the split entirely so debugging stays simple.
+    held_out_set: set[int] = set()
+    if args.all and not args.no_heldout:
+        all_numbers = [i["number"] for i in data["issues"]]
+        train_nums, held_nums = make_split(
+            all_numbers, heldout_size=args.heldout_size, seed=args.seed
+        )
+        held_out_set = set(held_nums)
+        print(
+            f"Split (seed={args.seed}): training={len(train_nums)} issues, "
+            f"held-out={len(held_nums)} issues -> {sorted(held_nums)}"
+        )
+
     coder_memory: "CoderMemory | None" = None
     reviewer_memory: "ReviewerMemory | None" = None
     if args.ablate:
@@ -247,8 +299,17 @@ def main():
             f"reviewer={len(reviewer_memory.all())} cases"
         )
 
-    for stream_index, issue in enumerate(issues, start=1):
-        print(f"\n=== Issue #{issue['number']}: {issue['title']} ===")
+    reviewer_frozen = False
+    recent_training_traces: list[dict] = []
+    training_index = 0  # 1-based index into the training stream for parity scheduling
+
+    for issue in issues:
+        held_out = issue["number"] in held_out_set
+        if not held_out:
+            training_index += 1
+        print(f"\n=== Issue #{issue['number']}: {issue['title']} "
+              f"({'HELD-OUT' if held_out else f'training #{training_index}'}) ===")
+
         trace = run_issue(
             issue,
             baseline=baseline,
@@ -256,25 +317,50 @@ def main():
             coder_memory=coder_memory,
             reviewer_memory=reviewer_memory,
         )
+        trace["held_out"] = held_out
+        trace["training_stream_index"] = None if held_out else training_index
+        trace["reviewer_frozen_before"] = reviewer_frozen
+        sched = schedule_for(
+            held_out=held_out,
+            stream_index=training_index,
+            reviewer_frozen=reviewer_frozen,
+        )
+        trace["scheduled_updates"] = sched
         save_trace(trace)
         print(f"  Done: {trace['rounds']} rounds, approved={trace['approved']}, "
-              f"oracle_passed_final={trace['oracle_passed_final']}")
+              f"oracle_passed_final={trace['oracle_passed_final']}, "
+              f"updates={sched}")
 
-        if not args.ablate:
-            # Guardrails (alternating schedule, held-out exclusion) are
-            # added in the next commit; for now we update both memories
-            # every issue. Distillation is best-effort - failures don't
-            # abort the run.
+        # Distillation is gated by the schedule. Held-out issues update
+        # nothing; training issues alternate parity; reviewer freeze
+        # disables reviewer updates only.
+        if not args.ablate and (sched["update_coder"] or sched["update_reviewer"]):
             try:
                 update_from_trace(
                     trace,
                     issue,
                     coder_memory=coder_memory,
                     reviewer_memory=reviewer_memory,
-                    schedule={"update_coder": True, "update_reviewer": True},
+                    schedule=sched,
                 )
             except Exception as e:  # noqa: BLE001
                 print(f"  WARNING: distillation failed: {e!r}")
+
+        # Reviewer audit (DESIGN.md sec 5.2). Runs only on training
+        # traces, over a sliding window. Once frozen, stays frozen
+        # (recovery is future work).
+        if not args.ablate and not held_out:
+            recent_training_traces.append(trace)
+            window = recent_training_traces[-args.audit_window:]
+            health = reviewer_audit(window)
+            if health.frozen and not reviewer_frozen:
+                print(
+                    f"  REVIEWER FROZEN after issue #{issue['number']} "
+                    f"(samples={health.samples}, precision={health.precision}, "
+                    f"approval={health.approval_rate_per_round}, "
+                    f"gap={health.balance_gap}); reasons={health.reasons}"
+                )
+                reviewer_frozen = True
 
 
 if __name__ == "__main__":
