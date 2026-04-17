@@ -1,5 +1,10 @@
 # Design: Co-Optimizing Coding and Review Agents
 
+> If you are new to this project, read [OVERVIEW.md](OVERVIEW.md) first.
+> It explains what the system does and why in plain language. This doc
+> assumes you already know the shape of the system and goes into how
+> each piece actually works.
+
 ## TL;DR
 
 Five pieces, plus guardrails to keep them honest.

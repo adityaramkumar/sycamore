@@ -6,6 +6,9 @@ against the usual self-play pathologies. Built against [arrow-py/arrow]'s
 real historical bug backlog (about 800 pre-baseline commits, 25 curated
 post-baseline fixes pinned to commit `c9cecaf`).
 
+**New here? Start with [docs/OVERVIEW.md](docs/OVERVIEW.md).** It's a
+plain-language walkthrough of what this project does and what we found.
+
 The three-part worktrial prompt is in [docs/PROBLEM.md](docs/PROBLEM.md).
 A direct point-by-point response lives in [docs/RESPONSE.md](docs/RESPONSE.md).
 Design writeup in [docs/DESIGN.md](docs/DESIGN.md), results in
@@ -72,9 +75,10 @@ sycamore/
 ├── data/
 │   └── issues.json           25 curated bugs, fix ground truth, baseline SHA
 ├── docs/
+│   ├── OVERVIEW.md           plain-language walkthrough, start here
 │   ├── PROBLEM.md            the worktrial prompt
 │   ├── RESPONSE.md           direct point-by-point response to PROBLEM.md
-│   ├── DESIGN.md             system design (high-schooler readable)
+│   ├── DESIGN.md             system design (technical)
 │   └── RESULTS.md            Phase B results and failure-mode analysis
 ├── harness/                  the code
 │   ├── loop.py               orchestrator and CLI
