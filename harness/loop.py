@@ -220,6 +220,12 @@ def save_trace(trace: dict):
 def main():
     parser = argparse.ArgumentParser(description="Run worktrial loop")
     parser.add_argument("--issue", type=int, help="Run a single issue by number")
+    parser.add_argument(
+        "--issues",
+        type=str,
+        help="Comma-separated issue numbers to run (a subset of all). "
+             "Useful for small ablations where alternating-update parity matters.",
+    )
     parser.add_argument("--all", action="store_true", help="Run all issues")
     parser.add_argument("--max-rounds", type=int, default=5)
     parser.add_argument(
@@ -269,14 +275,28 @@ def main():
             print(f"Issue {args.issue} not found in data/issues.json")
             sys.exit(1)
         issues = matching
+    elif args.issues:
+        try:
+            targets = {int(x.strip()) for x in args.issues.split(",") if x.strip()}
+        except ValueError:
+            print(f"--issues must be a comma-separated list of integers, got {args.issues!r}")
+            sys.exit(1)
+        matching = [i for i in issues if i["number"] in targets]
+        if not matching:
+            print(f"None of {sorted(targets)} found in data/issues.json")
+            sys.exit(1)
+        # Preserve the user-supplied order so parity scheduling is predictable.
+        order = {n: idx for idx, n in enumerate(int(x.strip()) for x in args.issues.split(",") if x.strip())}
+        matching.sort(key=lambda i: order.get(i["number"], 0))
+        issues = matching
     elif not args.all:
         parser.print_help()
         sys.exit(1)
 
-    # Held-out split (DESIGN.md sec 5 / 6.3). Single-issue runs and
-    # --no-heldout disable the split entirely so debugging stays simple.
+    # Held-out split (DESIGN.md sec 5 / 6.3). Subset and single-issue
+    # runs disable the split entirely so debugging stays simple.
     held_out_set: set[int] = set()
-    if args.all and not args.no_heldout:
+    if args.all and not args.issues and not args.no_heldout:
         all_numbers = [i["number"] for i in data["issues"]]
         train_nums, held_nums = make_split(
             all_numbers, heldout_size=args.heldout_size, seed=args.seed
