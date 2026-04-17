@@ -110,10 +110,20 @@ def _reviewer_confusion(traces: Iterable[IssueOutcome]) -> dict[str, int]:
       true_rejection  reviewer rejected   AND oracle failed   (WIN)
       false_approval  reviewer approved   AND oracle failed   (LOSS - missed bug)
       false_rejection reviewer rejected   AND oracle passed   (LOSS - over-asked)
+
+    Empty-diff rounds (coder produced no changes) are EXCLUDED. The
+    oracle trivially passes on a clean baseline tree, and the
+    reviewer trivially rejects "no changes were made" -- counting
+    this as a false rejection would falsely paint the reviewer as
+    over-asking when in fact it correctly rejected an empty submission.
     """
     cm = {"true_approval": 0, "true_rejection": 0, "false_approval": 0, "false_rejection": 0}
     for t in traces:
-        for approved, oracle_passed in zip(t.per_round_approved, t.per_round_oracle):
+        for approved, oracle_passed, diff_len in zip(
+            t.per_round_approved, t.per_round_oracle, t.diff_lengths
+        ):
+            if diff_len <= 0:
+                continue
             if approved and oracle_passed:
                 cm["true_approval"] += 1
             elif approved and not oracle_passed:
@@ -142,12 +152,29 @@ def compute(traces: list[IssueOutcome]) -> dict:
         return {"error": "No traces provided", "n_issues": 0}
 
     n = len(traces)
-    test_pass = sum(1 for t in traces if t.oracle_passed_final)
-    first_pass = sum(1 for t in traces if t.first_pass_oracle)
+    # Require a non-empty final/first diff to count as a "fix" - a clean
+    # baseline trivially passes the oracle, and we do not want
+    # "coder did nothing" rounds to inflate the headline number.
+    def _final_diff_nonempty(t: IssueOutcome) -> bool:
+        return bool(t.diff_lengths and t.diff_lengths[-1] > 0)
+
+    def _first_diff_nonempty(t: IssueOutcome) -> bool:
+        return bool(t.diff_lengths and t.diff_lengths[0] > 0)
+
+    test_pass = sum(1 for t in traces if t.oracle_passed_final and _final_diff_nonempty(t))
+    first_pass = sum(1 for t in traces if t.first_pass_oracle and _first_diff_nonempty(t))
     approved = sum(1 for t in traces if t.approved)
     avg_rounds = sum(t.rounds for t in traces) / n
 
-    rtp = [t.rounds_to_oracle_pass for t in traces if t.rounds_to_oracle_pass is not None]
+    rtp = []
+    for t in traces:
+        # Walk rounds to find the FIRST non-empty diff that passed oracle.
+        for r_idx, (oracle_passed, diff_len) in enumerate(
+            zip(t.per_round_oracle, t.diff_lengths), start=1
+        ):
+            if oracle_passed and diff_len > 0:
+                rtp.append(r_idx)
+                break
     avg_rounds_to_pass = (sum(rtp) / len(rtp)) if rtp else None
 
     cm = _reviewer_confusion(traces)

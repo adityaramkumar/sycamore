@@ -237,6 +237,11 @@ def update_from_trace(
             oracle = r.get("oracle") or {}
             if not oracle:
                 continue  # pre-oracle traces - nothing to calibrate against
+            # Empty-diff rounds are degenerate: oracle trivially passes
+            # on a clean baseline and reviewer trivially rejects "no
+            # changes". Skipping these matches metrics._reviewer_confusion.
+            if int(r.get("diff_length", 0)) <= 0:
+                continue
             outcome = _classify_round(
                 bool(r.get("approved")),
                 bool(oracle.get("passed")),
