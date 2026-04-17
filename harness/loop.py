@@ -20,9 +20,11 @@ import time
 try:
     from harness.coder import run_coder
     from harness.reviewer import run_reviewer
+    from harness.oracle import run as run_oracle
 except ImportError:
     from coder import run_coder  # type: ignore
     from reviewer import run_reviewer  # type: ignore
+    from oracle import run as run_oracle  # type: ignore
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), "..", "data", "issues.json")
 TRACES_DIR = os.path.join(os.path.dirname(__file__), "..", "traces")
@@ -65,13 +67,14 @@ def run_issue(issue: dict, baseline: str, max_rounds: int = 5) -> dict:
         "baseline": baseline,
         "rounds": 0,
         "approved": False,
+        "oracle_passed_final": False,
+        "first_pass_oracle": False,
         "comments_per_round": [],
     }
 
     git_checkout_baseline(repo_abs, baseline)
 
     extra_context = ""
-    prev_diff = ""
 
     issue_start = time.time()
 
@@ -86,6 +89,19 @@ def run_issue(issue: dict, baseline: str, max_rounds: int = 5) -> dict:
 
         diff = run_coder(issue, extra_context=extra_context)
 
+        # Oracle runs against the patched working tree BEFORE the reviewer.
+        # Its result is recorded in the trace but never passed to the
+        # reviewer prompt (DESIGN.md sec 5.1 / 7.2 information-flow contract).
+        print(f"  [Round {round_num}] Running oracle...", flush=True)
+        oracle_result = run_oracle(issue, repo=repo_abs)
+        oracle_dict = oracle_result.to_dict()
+        print(
+            f"  [Round {round_num}] Oracle: passed={oracle_result.passed} "
+            f"({oracle_result.n_passed}/{oracle_result.n_tests}, "
+            f"{oracle_result.elapsed_s:.2f}s)",
+            flush=True,
+        )
+
         print(f"  [Round {round_num}] Running reviewer... ({len(diff)} chars in diff)", flush=True)
         review = run_reviewer(issue, diff)
 
@@ -96,22 +112,38 @@ def run_issue(issue: dict, baseline: str, max_rounds: int = 5) -> dict:
             "diff": diff[:4000],  # truncated for trace storage
             "approved": review["approved"],
             "comments": review["comments"],
+            "oracle": oracle_dict,
         })
+
+        # Track first-round oracle outcome separately - this is the cleanest
+        # measure of coder quality without reviewer contamination.
+        if round_num == 1:
+            trace["first_pass_oracle"] = oracle_result.passed
+        # The oracle status of the *final* round we ran is what counts
+        # for the headline test_pass_rate metric.
+        trace["oracle_passed_final"] = oracle_result.passed
 
         elapsed = time.time() - round_start
         print(f"  [Round {round_num}] Approved: {review['approved']} ({elapsed:.0f}s)", flush=True)
         for c in review["comments"]:
             print(f"    - {c}", flush=True)
 
+        # Loop continuation is decided ONLY by the reviewer, not the oracle.
+        # Reviewer-approved + oracle-failed and reviewer-rejected + oracle-passed
+        # are valuable training signals we want to surface, not short-circuit.
         if review["approved"]:
             trace["approved"] = True
             break
 
         # Build context for next round: reviewer comments + what the coder
         # already changed, so it can iterate rather than start over.
+        # Oracle output is NOT included here.
         feedback_lines = "\n".join(f"- {c}" for c in review["comments"])
-        extra_context = f"Your current changes (DO NOT start over, iterate on these):\n```diff\n{diff[:3000]}\n```\n\nReviewer feedback to address:\n{feedback_lines}"
-        prev_diff = diff
+        extra_context = (
+            "Your current changes (DO NOT start over, iterate on these):\n"
+            f"```diff\n{diff[:3000]}\n```\n\n"
+            f"Reviewer feedback to address:\n{feedback_lines}"
+        )
 
     # Restore to master when done with this issue
     subprocess.run(["git", "checkout", "master"], cwd=repo_abs, capture_output=True)
