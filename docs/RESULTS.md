@@ -141,6 +141,64 @@ Each FULL worker started with an empty memory dir, so we never exercised cross-i
 
 ---
 
+## Phase C (post-fix verification, Sonnet, 2 issues)
+
+After Phase B exposed the reviewer-over-asking defect, we shipped four fixes:
+
+- Reviewer gets the git-history block too (commit `0d1918c`).
+- Coder prompt tells it to write a regression test alongside the source fix (commit `5b3374e`).
+- Balance-gap alert split into directional `reward_hacking_warning` vs `reviewer_over_asking_warning` (commit `35d228a`).
+- Oracle caches results when a round's diff is byte-identical to the previous round (commit `34aa5f2`).
+
+Phase C runs the same ablation on the two issues from Phase B that most visibly showed the over-asking problem: **1240** (humanize-boundary, Phase B rejected all 3 rounds in both arms) and **815** (missing-locale-timeframe, Phase B reviewer on FULL rejected an identical R1 diff that ABLATE approved). 2 issues across 2 arms, 4 parallel workers, about 15 minutes wall time.
+
+### Headline
+
+| Metric | FULL | ABLATE |
+|---|---|---|
+| `test_pass_rate` | **100%** (2/2) | 50% (1/2) |
+| `first_pass_test_pass_rate` | **100%** (2/2) | 50% (1/2) |
+| `approval_rate` (issue-level) | 100% (2/2) | 50% (1/2) |
+| `avg_rounds` | 1.5 | 2.0 |
+| `avg_rounds_to_oracle_pass` | 1.0 | 1.0 |
+| `reviewer_precision` | 100% | 100% |
+| `reviewer_recall` | **66.7%** (up from 50% in Phase B) | 100% (single sample) |
+| `reviewer_fpr` | 0% | 0% |
+| `balance_gap` | 33.3% (down from 50%) | 0% |
+| alerts | `reviewer_over_asking_warning` | `approval_saturation_high` (small-N noise) |
+
+The split alert now names the pathology correctly: Phase B mislabeled its over-asking as `reward_hacking_warning`; Phase C's FULL arm fires the correctly-named `reviewer_over_asking_warning`.
+
+### Per-issue breakdown
+
+| Issue | Phase B FULL | Phase C FULL | Phase B ABLATE | Phase C ABLATE |
+|---|---|---|---|---|
+| 1240 | 3 rounds, **rejected** (oracle passed R2+R3) | **2 rounds, approved** (R1 rejected, R2 identical cached diff approved) | 3 rounds, **rejected** | 3 rounds, **rejected** (zero diff all 3 rounds) |
+| 815 | 2 rounds, approved (R2 added tests) | **1 round, approved** (R1 diff included tests, 1762 chars) | 1 round, approved | 1 round, approved (same) |
+
+### What changed and why
+
+- **FULL/815 went 2 rounds -> 1 round** because the coder wrote the test in round 1. We can see it directly in the trace: the diff touches `tests/locales_tests.py` and the reviewer had no grounds to object. The test-writing prompt change worked exactly as intended.
+- **FULL/1240 went from rejected -> approved**, but for a different reason than we expected. The coder did NOT write a test on 1240 (the diff doesn't touch `tests/`). What happened: R1 produced an 821-char fix, reviewer rejected with 28 comments. R2 produced the same 821-char diff (the coder couldn't figure out what else to change). The oracle cache fired (cached=True, saved the pytest run). But this time the reviewer approved with only 9 comments. Same input, different verdict. Reviewer non-determinism helping us, possibly boosted by the feedback loop: R2's prompt includes the R1 feedback as context, which may let the model reflect that its previous concerns were nice-to-haves rather than blockers.
+- **ABLATE/1240 got worse, not better.** Phase B had the coder produce a 1168-char diff on R3. Phase C had zero diff all 3 rounds. Without the history block (ablated) and without accumulated memory (no prior issues), Sonnet just cannot locate this bug. The test-writing prompt change didn't help here because there was nothing to test.
+- **ABLATE/815 stayed at 1 round approved.** As in Phase B, the coder produced a clean 1144-char fix that did NOT include tests, and the reviewer approved. Confirms the reviewer is not blindly demanding tests.
+
+### What we actually fixed (and what remains)
+
+Fixed:
+
+- Reviewer's over-asking on tests is noticeably better. Phase B recall 50% -> Phase C recall 66.7%. On the specific issue that was the sharpest example (815 round 1, same 1144-char diff), the coder now prefers to include tests up front, so the reviewer never has to choose.
+- Alert labeling is now directional. In Phase B we had to explain in prose that the `reward_hacking_warning` was actually measuring over-asking. In Phase C it just says `reviewer_over_asking_warning`.
+- Oracle cache fires correctly on duplicate diffs. Modest wall-time saving on runs where the coder plateaus (saw this fire on FULL/1240 R2 and ABLATE/1240 R2-R3).
+
+Still open:
+
+- `reviewer_over_asking_warning` still fires on FULL. Recall is 66.7%, not 100%. We have N=1 false-rejection in FULL (the R1 of 1240). One more fix round would probably solve it, but this is the size of the remaining defect.
+- Coder still skips tests on hard cases. 1240 did not get a test added despite the prompt. If the bug reasoning is complex, the model focuses on the fix and forgets the test step. Could tighten with "the test MUST fail on the old code" or force an Edit to tests/ before submit_fix.
+- ABLATE on 1240 regressed. Sonnet with no context at all can't handle 1240. This is not a defect of our system per se (we don't run ablate in production); it just underlines how much the history block is doing for hard bugs.
+
+---
+
 ## Metrics I chose and why
 
 Metric choice follows DESIGN.md section 8 and the empty-diff-exclusion fix from Phase A.
