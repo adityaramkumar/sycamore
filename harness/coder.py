@@ -41,6 +41,7 @@ _CLAUDE_BIN = os.environ.get("CLI_PATH") or shutil.which("claude") or None
 def _build_system_prompt(
     extra_context: str = "",
     memory_block: str = "",
+    history_block: str = "",
     turn_budget: int = DEFAULT_MAX_TURNS,
 ) -> str:
     base = (
@@ -72,8 +73,13 @@ def _build_system_prompt(
         "- Do NOT run `pip install` or modify the Python environment.\n"
         "- Read-only git is fine: `git status`, `git diff`, `git log`, `git show`."
     )
-    # Memory block (lessons learned from past traces) goes before the
-    # round-specific reviewer feedback so it serves as durable guidance.
+    # Ordering: concrete examples from this repo's git history first
+    # (tied to the current issue), then distilled cross-issue lessons
+    # from the agent's own past traces, then the round-specific
+    # reviewer feedback. History + memory together approximate
+    # "context the agent would have if it worked on this repo full-time".
+    if history_block:
+        base += f"\n\n{history_block}"
     if memory_block:
         base += f"\n\n{memory_block}"
     if extra_context:
@@ -90,6 +96,7 @@ async def _run_coder_async(
     extra_context: str = "",
     max_turns: int = DEFAULT_MAX_TURNS,
     memory_block: str = "",
+    history_block: str = "",
 ) -> str:
     """Async impl. Returns the git diff produced by the agent."""
 
@@ -126,7 +133,12 @@ async def _run_coder_async(
 
     options = ClaudeAgentOptions(
         model=model,
-        system_prompt=_build_system_prompt(extra_context, memory_block, max_turns),
+        system_prompt=_build_system_prompt(
+            extra_context=extra_context,
+            memory_block=memory_block,
+            history_block=history_block,
+            turn_budget=max_turns,
+        ),
         cwd=os.path.abspath(REPO),
         max_turns=max_turns,
         allowed_tools=["Read", "Write", "Edit", "Bash", "mcp__worktrial-tools__submit_fix"],
@@ -199,13 +211,24 @@ def run_coder(
     extra_context: str = "",
     max_turns: int = DEFAULT_MAX_TURNS,
     memory_block: str = "",
+    history_block: str = "",
 ) -> str:
     """
     Run the coder agent on an issue.
     Returns the git diff string of all changes made.
 
-    `memory_block` is an optional preamble of distilled lessons from
-    past traces, injected into the system prompt by the loop layer.
-    The coder does not load memory itself - the loop owns that.
+    `memory_block`  - distilled cross-issue lessons from past traces.
+    `history_block` - concrete pre-baseline commits retrieved from the
+                      repo's git log that look related to this issue.
+
+    Both are optional and injected by the loop layer, which owns
+    memory state and retrieval. The coder itself has no persistence.
     """
-    return anyio.run(_run_coder_async, issue, extra_context, max_turns, memory_block)
+    return anyio.run(
+        _run_coder_async,
+        issue,
+        extra_context,
+        max_turns,
+        memory_block,
+        history_block,
+    )

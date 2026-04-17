@@ -23,6 +23,11 @@ try:
     from harness.oracle import run as run_oracle
     from harness.memory import CoderMemory, ReviewerMemory, categorize
     from harness.distill import update_from_trace
+    from harness.history import (
+        render_block as render_history_block,
+        retrieve_similar_fixes,
+        retrieved_sha_list,
+    )
     from harness.scheduler import (
         DEFAULT_HELDOUT_SIZE,
         DEFAULT_SEED,
@@ -36,6 +41,11 @@ except ImportError:
     from oracle import run as run_oracle  # type: ignore
     from memory import CoderMemory, ReviewerMemory, categorize  # type: ignore
     from distill import update_from_trace  # type: ignore
+    from history import (  # type: ignore
+        render_block as render_history_block,
+        retrieve_similar_fixes,
+        retrieved_sha_list,
+    )
     from scheduler import (  # type: ignore
         DEFAULT_HELDOUT_SIZE,
         DEFAULT_SEED,
@@ -102,6 +112,8 @@ def run_issue(
     max_rounds: int = 5,
     coder_memory: "CoderMemory | None" = None,
     reviewer_memory: "ReviewerMemory | None" = None,
+    forbidden_shas: "set[str] | None" = None,
+    use_history: bool = True,
 ) -> dict:
     """
     Run the coder→reviewer loop for a single issue against the pinned baseline.
@@ -111,6 +123,11 @@ def run_issue(
     contents into the agents' system prompts. The same memory blocks are
     used for every round of this issue (we do not refresh mid-issue);
     distillation happens only after the loop completes.
+
+    When use_history is True, we also retrieve up to 3 similar pre-baseline
+    commits from git log and inject them as a concrete-examples block in
+    the coder prompt. forbidden_shas (typically the 25 eval fix_commits)
+    are never returned as defense-in-depth against data leakage.
     """
     repo_abs = os.path.abspath(REPO)
 
@@ -152,8 +169,29 @@ def run_issue(
                 flush=True,
             )
 
+    # Git-history retrieval. Baseline-scoped with fix-SHA blacklist so
+    # eval leakage is impossible by construction.
+    history_block = ""
+    history_sha_ids: list[str] = []
+    if use_history:
+        try:
+            commits = retrieve_similar_fixes(
+                issue, repo_abs, baseline, forbidden_shas=forbidden_shas
+            )
+            history_block = render_history_block(commits)
+            history_sha_ids = retrieved_sha_list(commits)
+            if history_block:
+                print(
+                    f"  History: injecting {len(history_sha_ids)} commit(s) "
+                    f"from pre-baseline git log",
+                    flush=True,
+                )
+        except Exception as e:  # noqa: BLE001 - history is best-effort
+            print(f"  WARNING: history retrieval failed: {e!r}", flush=True)
+
     trace["coder_lesson_ids"] = coder_lesson_ids
     trace["reviewer_case_ids"] = reviewer_case_ids
+    trace["history_sha_ids"] = history_sha_ids
 
     issue_start = time.time()
 
@@ -166,7 +204,12 @@ def run_issue(
         if round_num == 1:
             git_reset_to_baseline(repo_abs)
 
-        diff = run_coder(issue, extra_context=extra_context, memory_block=coder_block)
+        diff = run_coder(
+            issue,
+            extra_context=extra_context,
+            memory_block=coder_block,
+            history_block=history_block,
+        )
 
         # The coder has Bash and could have moved HEAD off the baseline
         # (e.g. running `git checkout master`). If it did, the diff is
@@ -319,6 +362,11 @@ def main():
         default=6,
         help="How many recent training-stream traces to use for the reviewer audit (default 6).",
     )
+    parser.add_argument(
+        "--no-history",
+        action="store_true",
+        help="Disable git-history retrieval. Use for the no-history ablation arm.",
+    )
     args = parser.parse_args()
 
     data = load_data()
@@ -381,6 +429,13 @@ def main():
             f"reviewer={len(reviewer_memory.all())} cases"
         )
 
+    use_history = not args.no_history
+    print(f"Git-history retrieval: {'ON' if use_history else 'OFF'}")
+
+    # Defense-in-depth: every eval issue's fix_commit is blacklisted from
+    # history retrieval, independent of baseline-scope filtering.
+    forbidden_shas: set[str] = {i["fix_commit"] for i in data["issues"]}
+
     reviewer_frozen = False
     recent_training_traces: list[dict] = []
     training_index = 0  # 1-based index into the training stream for parity scheduling
@@ -398,6 +453,8 @@ def main():
             max_rounds=args.max_rounds,
             coder_memory=coder_memory,
             reviewer_memory=reviewer_memory,
+            forbidden_shas=forbidden_shas,
+            use_history=use_history,
         )
         trace["held_out"] = held_out
         trace["training_stream_index"] = None if held_out else training_index
