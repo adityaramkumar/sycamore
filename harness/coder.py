@@ -28,10 +28,12 @@ from claude_agent_sdk import (
 
 REPO = os.environ.get("TARGET_REPO_PATH", "./arrow")
 
-# Default turn budget: tight enough to prevent Haiku-style 60-turn
-# flailing we saw in Phase A, loose enough for careful fixes with
-# reviewer feedback. Override via `max_turns` arg or MAX_TURNS env var.
-DEFAULT_MAX_TURNS = int(os.environ.get("MAX_TURNS", "25"))
+# Default turn budget. Phase A with Haiku at 60+ turns was obviously
+# flailing; Phase B with Sonnet showed 12 thorough Grep/Read turns is
+# normal pre-edit exploration, not flailing. 40 leaves room for
+# Sonnet's more careful style while still bounding Haiku-style loops.
+# Override via `max_turns` arg or MAX_TURNS env var.
+DEFAULT_MAX_TURNS = int(os.environ.get("MAX_TURNS", "40"))
 
 # Use the system claude CLI (already logged in via Claude Max).
 # Falls back to whatever the SDK bundles if not found.
@@ -48,15 +50,14 @@ def _build_system_prompt(
         "You are a coding agent fixing bugs in a Python project. "
         "Be efficient: read the relevant file, make the fix, run tests, call submit_fix.\n\n"
         f"TURN BUDGET: You have {turn_budget} turns total. Each message from you "
-        "(whether tool use or text) counts as one turn. Spend them wisely:\n"
-        "- ~3 turns to locate the bug (read 1-2 files)\n"
-        "- ~2 turns to apply the fix with Edit\n"
-        "- ~3 turns to verify with Bash\n"
+        "(whether tool use or text) counts as one turn. Typical budget:\n"
+        "- ~5-10 turns to locate the bug (read files, grep)\n"
+        "- ~2-5 turns to apply the fix with Edit\n"
+        "- ~3-5 turns to verify with Bash\n"
         "- 1 turn to call submit_fix\n"
-        f"If you are past turn {turn_budget // 2} and have not called Edit yet, "
-        "you are flailing. STOP reading and commit to a fix based on the best "
-        "evidence you have. It's better to submit an imperfect fix than to run "
-        "out of turns with nothing.\n\n"
+        "Reserve at least 5 turns at the end to make the edit and submit_fix. "
+        "It's better to submit an imperfect fix than to run out of turns with "
+        "nothing.\n\n"
         "Workflow:\n"
         "1. Read the file(s) likely to contain the bug (1-3 turns max)\n"
         "2. Make the minimal fix with Edit (1-2 turns)\n"
@@ -176,13 +177,11 @@ async def _run_coder_async(
                     stopped_early = f"turn_budget_exhausted({turn}/{max_turns})"
                     _log(f"[turn {turn}] STOP: turn budget exhausted")
                     break
-                # Flailing heuristic 1: halfway through budget with no edits
-                if turn >= max_turns // 2 and edit_count == 0 and not fix_submitted["done"]:
-                    stopped_early = f"flailing_no_edits_by_turn_{turn}"
-                    _log(f"[turn {turn}] STOP: halfway through budget with no Edit yet")
-                    break
-                # Flailing heuristic 2: too many Bash calls in a row
-                if bash_run_length >= 8:
+                # Flailing heuristic: excessive Bash-only streak. Not Read/Grep,
+                # because Sonnet's thorough exploration is often Grep-heavy
+                # pre-edit and that's normal, not flailing. Bash streaks usually
+                # indicate "keep running tests, not edit yet" loops.
+                if bash_run_length >= 12:
                     stopped_early = f"bash_streak({bash_run_length})"
                     _log(f"[turn {turn}] STOP: {bash_run_length} Bash calls in a row without an Edit")
                     break
