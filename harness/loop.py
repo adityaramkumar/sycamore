@@ -196,6 +196,14 @@ def run_issue(
     trace["reviewer_case_ids"] = reviewer_case_ids
     trace["history_sha_ids"] = history_sha_ids
 
+    # Oracle-result cache: if the coder produces an identical diff two
+    # rounds in a row (happens when it cannot figure out what to change
+    # further, e.g. Phase B FULL/1240 R2 and R3), we skip the pytest
+    # rerun and reuse the previous result. Saves ~0.5s per duplicate
+    # round on arrow's targeted slice, more on the broader check.
+    prev_diff: str | None = None
+    prev_oracle_dict: dict | None = None
+
     issue_start = time.time()
 
     for round_num in range(1, max_rounds + 1):
@@ -255,15 +263,28 @@ def run_issue(
         # Oracle runs against the patched working tree BEFORE the reviewer.
         # Its result is recorded in the trace but never passed to the
         # reviewer prompt (DESIGN.md sec 5.1 / 7.2 information-flow contract).
-        print(f"  [Round {round_num}] Running oracle...", flush=True)
-        oracle_result = run_oracle(issue, repo=repo_abs)
-        oracle_dict = oracle_result.to_dict()
-        print(
-            f"  [Round {round_num}] Oracle: passed={oracle_result.passed} "
-            f"({oracle_result.n_passed}/{oracle_result.n_tests}, "
-            f"{oracle_result.elapsed_s:.2f}s)",
-            flush=True,
-        )
+        if prev_diff is not None and diff == prev_diff and prev_oracle_dict is not None:
+            oracle_dict = dict(prev_oracle_dict)
+            oracle_dict["cached"] = True
+            oracle_dict["elapsed_s"] = 0.0
+            print(
+                f"  [Round {round_num}] Oracle: CACHED (diff identical to "
+                f"round {round_num - 1}; reusing passed={oracle_dict.get('passed')})",
+                flush=True,
+            )
+        else:
+            print(f"  [Round {round_num}] Running oracle...", flush=True)
+            oracle_result = run_oracle(issue, repo=repo_abs)
+            oracle_dict = oracle_result.to_dict()
+            oracle_dict["cached"] = False
+            print(
+                f"  [Round {round_num}] Oracle: passed={oracle_result.passed} "
+                f"({oracle_result.n_passed}/{oracle_result.n_tests}, "
+                f"{oracle_result.elapsed_s:.2f}s)",
+                flush=True,
+            )
+        prev_diff = diff
+        prev_oracle_dict = oracle_dict
 
         print(f"  [Round {round_num}] Running reviewer... ({len(diff)} chars in diff)", flush=True)
         review = run_reviewer(
@@ -284,11 +305,12 @@ def run_issue(
 
         # Track first-round oracle outcome separately - this is the cleanest
         # measure of coder quality without reviewer contamination.
+        oracle_passed = bool(oracle_dict.get("passed"))
         if round_num == 1:
-            trace["first_pass_oracle"] = oracle_result.passed
+            trace["first_pass_oracle"] = oracle_passed
         # The oracle status of the *final* round we ran is what counts
         # for the headline test_pass_rate metric.
-        trace["oracle_passed_final"] = oracle_result.passed
+        trace["oracle_passed_final"] = oracle_passed
 
         elapsed = time.time() - round_start
         print(f"  [Round {round_num}] Approved: {review['approved']} ({elapsed:.0f}s)", flush=True)
