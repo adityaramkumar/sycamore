@@ -43,7 +43,14 @@ def _build_system_prompt(extra_context: str = "", memory_block: str = "") -> str
         "3. Run the relevant tests with Bash\n"
         "4. Call submit_fix with a one-sentence summary\n\n"
         "Do NOT explore the repo structure extensively. The bug is likely in "
-        "arrow/arrow.py, arrow/locales.py, or arrow/parser.py."
+        "arrow/arrow.py, arrow/locales.py, or arrow/parser.py.\n\n"
+        "STRICT RULES (violating these voids the round):\n"
+        "- Do NOT run `git checkout`, `git switch`, `git reset`, `git pull`, "
+        "  `git fetch`, `git stash`, `git rebase`, or anything that moves HEAD "
+        "  or changes which commit is checked out. The repo is pinned at a "
+        "  specific baseline commit and your fix must apply to THAT commit.\n"
+        "- Do NOT run `pip install` or modify the Python environment.\n"
+        "- Read-only git is fine: `git status`, `git diff`, `git log`, `git show`."
     )
     # Memory block (lessons learned from past traces) goes before the
     # round-specific reviewer feedback so it serves as durable guidance.

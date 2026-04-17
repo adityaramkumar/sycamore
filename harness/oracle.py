@@ -146,10 +146,15 @@ def run(issue: dict, repo: str | None = None, timeout_s: int | None = None) -> O
     if not targets:
         targets = ["tests/"]
 
+    # `--override-ini addopts=` neutralizes any pytest-cov flags the
+    # repo's setup.cfg/tox.ini might inject (master arrow's tox.ini does
+    # this and would crash pytest in our venv). The python_files override
+    # picks up the legacy *_tests.py naming used at baseline c9cecaf.
     cmd = [
         sys.executable, "-m", "pytest",
         *targets,
         "-p", "no:cacheprovider",
+        "--override-ini", "addopts=",
         "--override-ini", "python_files=*_tests.py *_test.py test_*.py",
         "--tb=no",
         "-q",

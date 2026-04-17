@@ -55,7 +55,13 @@ def load_data() -> dict:
 
 
 def git_checkout_baseline(repo: str, baseline: str):
-    """Detach HEAD at the pinned baseline commit."""
+    """Detach HEAD at the pinned baseline commit.
+
+    Discards any working-tree changes first so a dirty tree from a
+    previous issue (or a misbehaving coder) cannot block the checkout.
+    """
+    subprocess.run(["git", "checkout", "."], cwd=repo, capture_output=True)
+    subprocess.run(["git", "clean", "-fd"], cwd=repo, capture_output=True)
     result = subprocess.run(
         ["git", "checkout", baseline],
         cwd=repo,
@@ -70,6 +76,24 @@ def git_checkout_baseline(repo: str, baseline: str):
 def git_reset_to_baseline(repo: str):
     """Discard any uncommitted changes (keeps the checked-out commit)."""
     subprocess.run(["git", "checkout", "."], cwd=repo, check=True, capture_output=True)
+    subprocess.run(["git", "clean", "-fd"], cwd=repo, capture_output=True)
+
+
+def git_head_sha(repo: str) -> str:
+    """Return the current HEAD commit SHA (full)."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True
+    )
+    return result.stdout.strip()
+
+
+def assert_at_baseline(repo: str, baseline: str) -> tuple[bool, str]:
+    """Check whether HEAD is at the baseline commit. Returns (ok, current_sha).
+
+    The baseline may be a short SHA; we compare prefix-to-prefix.
+    """
+    current = git_head_sha(repo)
+    return current.startswith(baseline) or baseline.startswith(current), current
 
 
 def run_issue(
@@ -143,6 +167,44 @@ def run_issue(
             git_reset_to_baseline(repo_abs)
 
         diff = run_coder(issue, extra_context=extra_context, memory_block=coder_block)
+
+        # The coder has Bash and could have moved HEAD off the baseline
+        # (e.g. running `git checkout master`). If it did, the diff is
+        # against the wrong base and the oracle would test a different
+        # source tree. Detect, force-reset, and mark this round void.
+        head_ok, current_sha = assert_at_baseline(repo_abs, baseline)
+        if not head_ok:
+            print(
+                f"  [Round {round_num}] WARNING: HEAD drifted to {current_sha[:8]} "
+                f"(expected {baseline[:8]}). Force-resetting and voiding this round.",
+                flush=True,
+            )
+            git_checkout_baseline(repo_abs, baseline)
+            void_oracle = {
+                "passed": False,
+                "targeted_files": [],
+                "n_tests": 0,
+                "n_passed": 0,
+                "n_failed": 0,
+                "failing_tests": [],
+                "elapsed_s": 0.0,
+                "timed_out": False,
+                "error": f"void: HEAD drifted to {current_sha[:8]}",
+            }
+            trace["rounds"] = round_num
+            trace["comments_per_round"].append({
+                "round": round_num,
+                "diff_length": 0,
+                "diff": "",
+                "approved": False,
+                "comments": [f"VOID: coder moved HEAD off baseline ({current_sha[:8]})"],
+                "oracle": void_oracle,
+            })
+            if round_num == 1:
+                trace["first_pass_oracle"] = False
+            trace["oracle_passed_final"] = False
+            extra_context = "Your previous round moved HEAD off the baseline commit. Do NOT run git checkout, git reset, or any command that changes HEAD."
+            continue
 
         # Oracle runs against the patched working tree BEFORE the reviewer.
         # Its result is recorded in the trace but never passed to the
