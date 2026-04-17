@@ -1,0 +1,4 @@
+claude-agent-sdk>=0.0.20
+anyio>=4.0.0
+gitpython>=3.1.0
+requests>=2.31.0

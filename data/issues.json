@@ -1,0 +1,325 @@
+{
+  "repo": "arrow-py/arrow",
+  "repo_url": "https://github.com/arrow-py/arrow",
+  "description": "Arrow is a small (~2200 LOC), well-tested Python date/time library with a rich history of similar, recurring bug classes: locale humanize errors, date parsing edge cases, DST handling, and token formatting bugs. It has excellent test coverage (tests/test_arrow.py, tests/test_locales.py, tests/test_parser.py), is Python-only, and has dozens of closed bugs fixed with 1-3 file changes mostly in arrow/arrow.py, arrow/locales.py, or arrow/parser.py. The bug category is extremely homogeneous \u2014 almost all bugs are variations of 'humanize/locale output is wrong' or 'parsing edge case produces wrong result', making it ideal for a coding+review agent worktrial.",
+  "bug_category": "humanize/locale output bugs and date parsing edge cases in arrow/locales.py, arrow/arrow.py, and arrow/parser.py",
+  "issues": [
+    {
+      "number": 1240,
+      "title": "humanize reports '16 days' as 'a month' instead of '2 weeks'",
+      "body_summary": "humanize() incorrectly reports a 16-day difference as 'in a month' instead of 'in 2 weeks' due to a logic error in calendar_diff handling.",
+      "fix_commit": "b423717d",
+      "fix_pr": 1242,
+      "files_changed": [
+        "arrow/arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/1240"
+    },
+    {
+      "number": 1056,
+      "title": "Incorrect plural for seconds in Russian (locale: ru_RU)",
+      "body_summary": "humanize() produces incorrect Russian plural forms for 'seconds' due to a missing or wrong plural rule in RussianLocale.",
+      "fix_commit": "baebfff4",
+      "fix_pr": 1057,
+      "files_changed": [
+        "arrow/locales.py",
+        "tests/test_arrow.py",
+        "tests/test_locales.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/1056"
+    },
+    {
+      "number": 1062,
+      "title": "No support for quarter granularity in Russian (locale: ru_RU)",
+      "body_summary": "humanize() with granularity='quarter' raises ValueError for Russian locale because quarter timeframe was not defined in RussianLocale.",
+      "fix_commit": "8f5b21f0",
+      "fix_pr": 1063,
+      "files_changed": [
+        "arrow/locales.py",
+        "tests/test_locales.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/1062"
+    },
+    {
+      "number": 1019,
+      "title": "Humanize doesn't support 'quarter' for granularity",
+      "body_summary": "humanize() with granularity=['quarter'] raised an error because quarter granularity was not implemented in arrow.py.",
+      "fix_commit": "f7a3aa32",
+      "fix_pr": 1048,
+      "files_changed": [
+        "arrow/arrow.py",
+        "arrow/locales.py",
+        "tests/test_arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/1019"
+    },
+    {
+      "number": 1015,
+      "title": "Empty List of Granularities For Humanize Doesn't Raise ValueError",
+      "body_summary": "Passing an empty list to humanize(granularity=[]) should raise a ValueError but instead silently produces wrong output.",
+      "fix_commit": "cc1cbeb0",
+      "fix_pr": 1016,
+      "files_changed": [
+        "arrow/arrow.py",
+        "tests/test_arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/1015"
+    },
+    {
+      "number": 996,
+      "title": "Humanize Format Relative Error For Multiple Granularities",
+      "body_summary": "humanize() with multiple granularities including 'second' returns incorrect output due to a bug in the relative time formatting for Slavic locales.",
+      "fix_commit": "a2ebb7e2",
+      "fix_pr": 1077,
+      "files_changed": [
+        "arrow/arrow.py",
+        "arrow/constants.py",
+        "arrow/locales.py",
+        "tests/test_arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/996"
+    },
+    {
+      "number": 1078,
+      "title": "Czech/Slovak Locales Humanize Error When Zero Delta",
+      "body_summary": "humanize() raises an error for Czech and Slovak locales when the time delta is zero because dehumanize support was missing for those locales.",
+      "fix_commit": "74bc0a1d",
+      "fix_pr": 1079,
+      "files_changed": [
+        "arrow/constants.py",
+        "arrow/locales.py",
+        "tests/test_arrow.py",
+        "tests/test_locales.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/1078"
+    },
+    {
+      "number": 789,
+      "title": "Floats in humanize output for languages overriding _format_timeframe",
+      "body_summary": "humanize() produces float values (e.g. '2.0 hours') instead of integers for locales that override _format_timeframe method.",
+      "fix_commit": "b8a9df75",
+      "fix_pr": 986,
+      "files_changed": [
+        "arrow/locales.py",
+        "tests/test_arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/789"
+    },
+    {
+      "number": 848,
+      "title": "humanize() rounding problem",
+      "body_summary": "humanize() with granularity='auto' uses incorrect boundary limits causing a 30-day diff to be reported as 'a month' vs '4 weeks'.",
+      "fix_commit": "609b630b",
+      "fix_pr": 868,
+      "files_changed": [
+        "arrow/arrow.py",
+        "tests/test_arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/848"
+    },
+    {
+      "number": 815,
+      "title": "Week granularity not found in Czech locale",
+      "body_summary": "humanize() with granularity='week' raises ValueError for Czech locale because 'week' and 'weeks' timeframes were missing from CzechLocale.",
+      "fix_commit": "4c99ae3e",
+      "fix_pr": 816,
+      "files_changed": [
+        "arrow/locales.py",
+        "tests/test_locales.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/815"
+    },
+    {
+      "number": 803,
+      "title": "Korean locale broken when humanize() uses 'n weeks' timeframe",
+      "body_summary": "humanize() raises ValueError for Korean locale when the result should be expressed in weeks because 'week'/'weeks' timeframes were not defined.",
+      "fix_commit": "451a3fef",
+      "fix_pr": 804,
+      "files_changed": [
+        "arrow/locales.py",
+        "tests/test_locales.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/803"
+    },
+    {
+      "number": 727,
+      "title": "humanize granularity doesn't behave as expected",
+      "body_summary": "humanize() with granularity=['seconds'] returns wrong output (e.g., '0 seconds' for a 200-second difference) due to incorrect singular/plural handling.",
+      "fix_commit": "6adb8dbc",
+      "fix_pr": 748,
+      "files_changed": [
+        "arrow/arrow.py",
+        "arrow/locales.py",
+        "tests/arrow_tests.py",
+        "tests/locales_tests.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/727"
+    },
+    {
+      "number": 697,
+      "title": ".humanize() leads to wrong result with datetime.date",
+      "body_summary": "humanize() produces wrong results (e.g., '6 hours ago') when called on an Arrow object created from a naive datetime.date because timezone comparison goes wrong.",
+      "fix_commit": "6adb8dbc",
+      "fix_pr": 748,
+      "files_changed": [
+        "arrow/arrow.py",
+        "arrow/locales.py",
+        "tests/arrow_tests.py",
+        "tests/locales_tests.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/697"
+    },
+    {
+      "number": 541,
+      "title": "humanize has odd behavior with future days",
+      "body_summary": "humanize() with granularity='day' returns 'in a day' for durations that are 2+ days in the future due to an off-by-one in future day boundaries.",
+      "fix_commit": "88de0faf",
+      "fix_pr": 575,
+      "files_changed": [
+        "arrow/arrow.py",
+        "tests/arrow_tests.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/541"
+    },
+    {
+      "number": 851,
+      "title": "\"dddd\" and \"ddd\" tokens no longer support different capitalisations from 0.15.8",
+      "body_summary": "Parsing day-of-week tokens (ddd/dddd) became case-sensitive in 0.15.8, causing failures for inputs like 'monday' or 'MONDAY' where only 'Monday' worked.",
+      "fix_commit": "405e0a55",
+      "fix_pr": 852,
+      "files_changed": [
+        "arrow/parser.py",
+        "tests/test_parser.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/851"
+    },
+    {
+      "number": 842,
+      "title": "Range gives inconsistent results for month end",
+      "body_summary": "arrow.Arrow.range() and span_range() produce incorrect results at the end of month/quarter/year frames, returning dates outside the expected range.",
+      "fix_commit": "da6ed8c0",
+      "fix_pr": 844,
+      "files_changed": [
+        "arrow/arrow.py",
+        "tests/test_arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/842"
+    },
+    {
+      "number": 686,
+      "title": "Problem with differences between time points during DST transition",
+      "body_summary": "Arrow raises an exception or produces wrong results when computing differences across DST transitions involving imaginary datetimes.",
+      "fix_commit": "7bb5c603",
+      "fix_pr": 845,
+      "files_changed": [
+        "arrow/arrow.py",
+        "tests/test_arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/686"
+    },
+    {
+      "number": 636,
+      "title": "Error parsing date with over 999999 in microseconds",
+      "body_summary": "Parsing a timestamp string with more than 6 fractional-second digits raises 'microsecond must be in 0..999999' instead of truncating correctly.",
+      "fix_commit": "fce69267",
+      "fix_pr": 643,
+      "files_changed": [
+        "arrow/parser.py",
+        "tests/parser_tests.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/636"
+    },
+    {
+      "number": 625,
+      "title": "Make .get() handle string tzinfo kwarg properly",
+      "body_summary": "arrow.get() with a string tzinfo keyword argument raises an error instead of properly resolving the timezone.",
+      "fix_commit": "56f665d9",
+      "fix_pr": 640,
+      "files_changed": [
+        "arrow/arrow.py",
+        "arrow/factory.py",
+        "tests/arrow_tests.py",
+        "tests/factory_tests.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/625"
+    },
+    {
+      "number": 607,
+      "title": "\"a\" token for am/pm is not being processed in get() when using Spanish locale",
+      "body_summary": "Parsing a time string with Spanish locale fails to interpret the 'a' (am/pm) token because meridians were missing from the Spanish locale definition.",
+      "fix_commit": "3685d4c1",
+      "fix_pr": 610,
+      "files_changed": [
+        "arrow/locales.py",
+        "tests/parser_tests.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/607"
+    },
+    {
+      "number": 703,
+      "title": "HH token does not support the number 24 (midnight at end of day)",
+      "body_summary": "Parsing times with HH=24 (valid in some formats to represent midnight at end of day) raises a ValueError instead of being handled gracefully.",
+      "fix_commit": "6a5819b7",
+      "fix_pr": 705,
+      "files_changed": [
+        "arrow/parser.py",
+        "tests/parser_tests.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/703"
+    },
+    {
+      "number": 456,
+      "title": "Parsing gives incorrect data instead of failing for unknown ISO format",
+      "body_summary": "Parsing ISO 8601 week-date strings like '2001W05' returns a wrong date (2001-05-01) instead of raising a parse error.",
+      "fix_commit": "2344c11f",
+      "fix_pr": 655,
+      "files_changed": [
+        "arrow/arrow.py",
+        "arrow/factory.py",
+        "arrow/parser.py",
+        "arrow/util.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/456"
+    },
+    {
+      "number": 560,
+      "title": "YY token maps 2018 to year 20 instead of 2018",
+      "body_summary": "The YY token (2-digit year) was incorrectly mapped to 2020 as '20' rather than properly interpreting '18' as 2018.",
+      "fix_commit": "2344c11f",
+      "fix_pr": 655,
+      "files_changed": [
+        "arrow/arrow.py",
+        "arrow/factory.py",
+        "arrow/parser.py",
+        "arrow/util.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/560"
+    },
+    {
+      "number": 1224,
+      "title": "Fix humanize month limits (incorrect boundary between weeks and months)",
+      "body_summary": "humanize() incorrectly transitions from 'weeks' to 'months' at the wrong number of days due to an off-by-one in month boundary calculation.",
+      "fix_commit": "05cd9b47",
+      "fix_pr": 1224,
+      "files_changed": [
+        "arrow/arrow.py",
+        "tests/test_arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/1224"
+    },
+    {
+      "number": 729,
+      "title": "String escape doesn't work in arrow format strings",
+      "body_summary": "Using escape brackets [] in arrow format strings to prevent token substitution does not work correctly, causing literal text to be interpreted as tokens.",
+      "fix_commit": "2344c11f",
+      "fix_pr": 655,
+      "files_changed": [
+        "arrow/parser.py",
+        "arrow/arrow.py"
+      ],
+      "url": "https://github.com/arrow-py/arrow/issues/729"
+    }
+  ],
+  "baseline_commit": "c9cecaf",
+  "baseline_note": "Commit just before the oldest fix in this issue set (pre 88de0faf, 2019-04-26). All 25 issues are unfixed at this point."
+}
