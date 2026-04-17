@@ -33,6 +33,13 @@ REPO = os.environ.get("TARGET_REPO_PATH", "./arrow")
 DEFAULT_TIMEOUT_S = int(os.environ.get("ORACLE_TIMEOUT_S", "120"))
 MAX_FAILURES_LOGGED = 15
 
+# After the targeted-test slice passes, optionally run the broader
+# tests/ directory as a regression sanity check. Catches cross-file
+# breakage a narrow slice would miss (e.g. a fix in arrow/arrow.py
+# that accidentally breaks something in tests/locales_tests.py).
+# Toggle off via ORACLE_BROADER_CHECK=0 if it gets too slow.
+BROADER_CHECK_ENABLED = os.environ.get("ORACLE_BROADER_CHECK", "1") != "0"
+
 SOURCE_TO_TESTS: dict[str, str] = {
     "arrow/arrow.py":     "tests/arrow_tests.py",
     "arrow/locales.py":   "tests/locales_tests.py",
@@ -56,16 +63,29 @@ TEST_NAME_NORMALIZE: dict[str, str] = {
 class OracleResult:
     """Structured outcome of a single oracle invocation.
 
-    Field semantics:
-      passed         True iff pytest exited 0 AND at least one test ran
-                     AND zero failures/errors.
-      targeted_files Test files we asked pytest to run. ["tests/"] means
-                     fallback-to-full-suite.
-      n_tests        Total tests collected (passed + failed + skipped).
-      failing_tests  Up to MAX_FAILURES_LOGGED node ids, for diagnostics.
-      timed_out      True if subprocess hit ORACLE_TIMEOUT_S.
-      error          Non-empty if pytest itself crashed (e.g. collection
-                     failure due to a broken import in the patched code).
+    Primary field (what downstream metrics key on):
+      passed          True iff the targeted slice passed AND (if run) the
+                      broader regression check also passed.
+
+    Targeted slice (the issue-specific test files):
+      targeted_files  Test files we asked pytest to run. ["tests/"] means
+                      fallback-to-full-suite — usually indicates the issue
+                      changed source files we have no test mapping for.
+      n_tests / n_passed / n_failed / failing_tests
+      elapsed_s       Wall time of the targeted slice.
+
+    Broader regression check (only populated when targeted passed AND
+    ORACLE_BROADER_CHECK is enabled). Runs the entire tests/ directory.
+      broader_ran         True if we actually ran it.
+      broader_passed      True iff every test in tests/ passed.
+      broader_n_tests / broader_n_failed / broader_failing
+      broader_elapsed_s
+
+    Failure modes:
+      timed_out       subprocess hit ORACLE_TIMEOUT_S.
+      error           pytest itself crashed (e.g. patched code fails to
+                      import, HEAD drift, pytest-cov flags from tox.ini,
+                      etc). When non-empty, n_tests will typically be 0.
     """
     passed: bool
     targeted_files: list[str]
@@ -76,6 +96,13 @@ class OracleResult:
     elapsed_s: float = 0.0
     timed_out: bool = False
     error: str = ""
+    # Broader regression check (optional).
+    broader_ran: bool = False
+    broader_passed: bool = False
+    broader_n_tests: int = 0
+    broader_n_failed: int = 0
+    broader_failing: list[str] = field(default_factory=list)
+    broader_elapsed_s: float = 0.0
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -134,22 +161,14 @@ def _parse_pytest_output(out: str, targets: list[str], elapsed_s: float, returnc
     )
 
 
-def run(issue: dict, repo: str | None = None, timeout_s: int | None = None) -> OracleResult:
-    """Run pytest against the current working tree of `repo`, targeting
-    test files inferred from issue['files_changed']. Falls back to the
-    full tests/ directory if no targeted file applies.
+def _run_pytest(targets: list[str], repo_abs: str, timeout_s: int) -> tuple[OracleResult, bool]:
+    """Run pytest against `targets` from `repo_abs`. Returns (result, timed_out).
+
+    `--override-ini addopts=` neutralizes any pytest-cov flags the
+    repo's setup.cfg/tox.ini might inject (master arrow's tox.ini does
+    this and would crash pytest in our venv). The python_files override
+    picks up the legacy *_tests.py naming used at baseline c9cecaf.
     """
-    repo_abs = os.path.abspath(repo or REPO)
-    timeout = timeout_s or DEFAULT_TIMEOUT_S
-
-    targets = _resolve_test_files(issue.get("files_changed", []), repo_abs)
-    if not targets:
-        targets = ["tests/"]
-
-    # `--override-ini addopts=` neutralizes any pytest-cov flags the
-    # repo's setup.cfg/tox.ini might inject (master arrow's tox.ini does
-    # this and would crash pytest in our venv). The python_files override
-    # picks up the legacy *_tests.py naming used at baseline c9cecaf.
     cmd = [
         sys.executable, "-m", "pytest",
         *targets,
@@ -160,7 +179,6 @@ def run(issue: dict, repo: str | None = None, timeout_s: int | None = None) -> O
         "-q",
         "--no-header",
     ]
-
     start = time.time()
     try:
         proc = subprocess.run(
@@ -168,23 +186,73 @@ def run(issue: dict, repo: str | None = None, timeout_s: int | None = None) -> O
             cwd=repo_abs,
             capture_output=True,
             text=True,
-            timeout=timeout,
+            timeout=timeout_s,
         )
     except subprocess.TimeoutExpired:
-        return OracleResult(
+        result = OracleResult(
             passed=False,
             targeted_files=targets,
             elapsed_s=time.time() - start,
             timed_out=True,
-            error=f"pytest timed out after {timeout}s",
+            error=f"pytest timed out after {timeout_s}s",
         )
-
-    return _parse_pytest_output(
+        return result, True
+    result = _parse_pytest_output(
         proc.stdout + proc.stderr,
         targets,
         time.time() - start,
         proc.returncode,
     )
+    return result, False
+
+
+def run(issue: dict, repo: str | None = None, timeout_s: int | None = None) -> OracleResult:
+    """Run the oracle against the current working tree of `repo`.
+
+    1. Targeted slice: pytest on the test files inferred from
+       issue['files_changed'] (falls back to full tests/ if none apply).
+    2. Broader regression check: if (1) passed AND ORACLE_BROADER_CHECK
+       is on, also run the full tests/ directory. Both must pass for
+       `result.passed` to be True.
+    """
+    repo_abs = os.path.abspath(repo or REPO)
+    timeout = timeout_s or DEFAULT_TIMEOUT_S
+
+    targets = _resolve_test_files(issue.get("files_changed", []), repo_abs)
+    if not targets:
+        targets = ["tests/"]
+
+    result, _ = _run_pytest(targets, repo_abs, timeout)
+
+    # Skip broader check if the targeted slice already failed (no signal
+    # to gain — something's already broken, we know the diff is bad) OR
+    # if the targeted slice WAS the full tests/ directory (no point
+    # running it twice) OR if broader check is disabled.
+    if (
+        not result.passed
+        or not BROADER_CHECK_ENABLED
+        or targets == ["tests/"]
+    ):
+        return result
+
+    broader_start = time.time()
+    broader, _ = _run_pytest(["tests/"], repo_abs, timeout)
+    result.broader_ran = True
+    result.broader_passed = broader.passed
+    result.broader_n_tests = broader.n_tests
+    result.broader_n_failed = broader.n_failed
+    result.broader_failing = broader.failing_tests
+    result.broader_elapsed_s = round(time.time() - broader_start, 3)
+    # passed is only True if BOTH checks pass
+    result.passed = result.passed and broader.passed
+    if not broader.passed and not result.error:
+        # Surface the broader failure so traces are diagnosable.
+        result.error = (
+            f"targeted slice passed but broader tests/ failed: "
+            f"{broader.n_failed}/{broader.n_tests}, "
+            f"first: {broader.failing_tests[:3]}"
+        )
+    return result
 
 
 def _cli():
