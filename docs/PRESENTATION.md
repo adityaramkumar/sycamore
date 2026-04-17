@@ -7,7 +7,7 @@ One slide per section. Each slide has:
 - **Visual**: what to draw, screenshot, or chart. Most are doable with Google Slides shapes, Google Sheets charts, or a screenshot.
 - **Say**: speaker notes. Carry the content that isn't on the slide.
 
-24 slides, about 20 to 25 minutes. Slide 18 (Phase D) is your strongest moment; if you need to cut, merge 2+3 and 10+11.
+22 slides, about 18 to 22 minutes. Slide 16 (Phase D) is your strongest moment; if you need to cut, merge 2+3 and 10+11.
 
 Design principles used here:
 
@@ -261,134 +261,123 @@ Running 10 bugs one at a time takes about an hour. To speed that up I used git w
 
 ---
 
-## Slide 13. Phase A: integration test (Haiku)
+## Slide 13. Where we ran it
 
 **On slide:**
 
-- 3 bugs.
-- Did the plumbing work? Yes.
-- Caught 2 bugs in my own system.
+Phase A (pilot, 3 bugs, Haiku): pipeline works. Caught 2 bugs in my own system.
 
-**Visual:**
-A split panel:
-- Left: green checkmark and "Pipeline works".
-- Right: two red bug icons labeled "Coder cheated with git checkout" and "Empty rounds miscounted".
+Phase B (real run, 5 bugs, Sonnet):
 
-**Say:**
-The first run was mostly about finding bugs in my own system, not bugs in arrow. And it did. My Coder was cheating with its shell access. My metrics were miscounting empty rounds. Both got fixed before the real measurement.
-
----
-
-## Slide 14. Phase B: the ablation
-
-**On slide:**
-
-- Both arms: 100% bugs fixed.
+- Both FULL and ABLATE fixed 100% of bugs.
 - FULL slightly faster (1.2 rounds vs 1.4).
-- **Recall is only ~50% in both.**
-- (recall = does the Reviewer notice good code)
+- **But Reviewer recall was only about 50%.**
+
+*(Reviewer recall: of the fixes that actually worked, how many did the Reviewer approve?)*
 
 **Visual:**
-Grouped bar chart. X-axis: 4 metrics (`test_pass_rate`, `rounds_to_pass`, `precision`, `recall`). Y-axis: value. Two bars per metric: FULL (blue) and ABLATE (gray).
-- `test_pass_rate`: both 100%
-- `rounds_to_pass`: 1.2 vs 1.4
-- `precision`: both 100%
-- **`recall`: 50% vs 57%, both short.** Red callout pointing at this column.
+Two-panel slide.
 
-Add a small legend below the chart with the plain-English gloss: "recall = of the correct fixes, how many did the Reviewer approve?"
+- Left panel: "Phase A" block. Green check labeled "pipeline works". Two small red bug icons below, captions "Coder cheated with git checkout" and "Empty rounds miscounted". Label: "caught in our own system".
+- Right panel: "Phase B" block. Grouped bar chart with 4 pairs (test_pass_rate, rounds_to_pass, precision, recall), FULL blue vs ABLATE gray. Red callout on the recall bars pointing down: "only ~50%". Tiny legend: "recall = of correct fixes, how many did the Reviewer approve?".
 
 **Say:**
-Phase B was the real measurement. Both arms fixed all 5 bugs, looked boring. But the per-agent breakdown told a different story. Reviewer recall was only around half. Half the time the Coder wrote code that actually passed tests, the Reviewer rejected it anyway. That's a big finding the headline alone would have hidden.
+Phase A was our pilot with Haiku. Three bugs. Mostly verified the pipeline works and caught two bugs in our own system: the Coder was cheating by running `git checkout master` through its shell, and our metrics were miscounting empty rounds. Both fixed before the real measurement.
+
+Phase B was the real ablation. Five bugs, Sonnet, two arms. Looked boring at first because both arms fixed all 5 bugs. But the per-agent breakdown showed something interesting: Reviewer recall was only about half. That means half the time the Coder wrote code that actually worked, the Reviewer rejected it anyway.
 
 ---
 
-## Slide 15. One bug up close: issue 1240
+## Slide 14. Why recall was low: the Reviewer is too picky
 
 **On slide:**
 
-- Bug: `humanize(16 days)` should say "2 weeks", not "a month".
+Issue 1240 example. Bug: `humanize(16 days)` should say "2 weeks", not "a month".
 
-| Round | Diff | Oracle | Reviewer |
-|---|---|---|---|
-| 1 | 821 chars | **PASS** | **REJECT** (28 comments) |
-| 2 | 821 chars | PASS (cached) | REJECT |
-| 3 | 821 chars | PASS (cached) | REJECT |
-
-**Visual:**
-Screenshot of a real diff (arrow's fix for 1240 is public). Next to it, an email-or-comment bubble with the Reviewer's first few rejection comments. Big red X next to "Approved?" but a big green check next to "Tests pass?"
-
-**Say:**
-This is the clearest example of the problem. The Coder wrote a fix. The Oracle said it worked. The Reviewer rejected it three times in a row, asking for more edge cases and more tests. If I'd only had the Reviewer's verdict, I'd have concluded the Coder was bad. With the Oracle, I could see the Coder was fine and the Reviewer was the picky one.
-
----
-
-## Slide 16. The surprise: Reviewer is too picky
-
-**On slide:**
-
-- **7 of 15 rounds: good fix, rejected anyway.**
-- The Reviewer was correct when it approved (precision 100%).
-- But it missed half the correct fixes (recall 50%).
-
-**Visual:**
-A 2x2 confusion matrix with plain-English labels, not just the metric names:
-
-|  | **Tests said PASS** | **Tests said FAIL** |
+| Round | Oracle | Reviewer |
 |---|---|---|
-| **Reviewer approved** | 5 | 0 |
-| **Reviewer rejected** | **7** | 3 |
+| 1 | PASS | REJECT (28 comments) |
+| 2 | PASS | REJECT |
+| 3 | PASS | REJECT |
 
-Label the 7 with a red callout: "rejected good fixes". Label the 5 with a small green check: "correctly approved". Under the matrix, one line: "Reviewer never approved bad code (good), but rejected half the good code (problem)."
+Across all 15 rounds: **reviewer rejected 7 correct fixes.**
+
+|  | Tests PASS | Tests FAIL |
+|---|---|---|
+| Reviewer approved | 5 | 0 |
+| Reviewer rejected | **7** | 3 |
+
+Reviewer never approved bad code (precision 100%) but rejected half the good code (recall 50%).
+
+**Visual:**
+Two mini visuals side by side.
+
+- Left: issue 1240's round-by-round table. Big green check next to "tests passed every round". Big red X next to "reviewer approved?".
+- Right: 2x2 confusion matrix. Red callout on "7 rejected good fixes". Green check on "5 correctly approved". Label: "never approved bad code; missed half the good".
 
 **Say:**
-The Reviewer is too picky. Not lazy, not dishonest. Nitpicky. It kept asking for more tests even when the fix worked. Interestingly, the real arrow fixes usually include tests too, so the Reviewer's instinct was reasonable. The problem was the Coder wasn't meeting it.
+This is the clearest example. On issue 1240 the Coder wrote a working fix. The Oracle said tests passed. The Reviewer rejected three rounds in a row asking for more tests, more edge cases. If I only had the Reviewer's verdict, I'd have concluded the Coder was bad. With the Oracle, I can see the Coder was fine and the Reviewer was too picky. Across all 15 rounds the pattern is the same: 7 out of 15 times, the Reviewer rejected code that actually worked. Not dishonest, just nitpicky. Interestingly, real arrow fixes usually include tests, so the Reviewer's instinct was reasonable. The Coder just wasn't meeting it.
 
 ---
 
-## Slide 17. Phase C: fix the Coder, not the Reviewer
+## Slide 15. Phase C: fix the Coder, not the Reviewer
 
 **On slide:**
 
-- Tell the Coder to write tests up front.
-- Recall jumped 50% to 67%.
+- Instead of telling the Reviewer "approve without tests"
+- We told the Coder to **write** the tests up front.
+
+Result:
+
+- Reviewer recall: 50% → **67%**
+- Issue 815: 2 rounds → **1 round**
+- The Coder now brings what the Reviewer would have asked for.
 
 **Visual:**
-Two bars showing `reviewer_recall`:
-- Before (Phase B): 50%
-- After (Phase C): 66.7%
-Arrow pointing up, labeled "+16.7".
+Before-and-after bar chart of reviewer_recall: Phase B at 50%, Phase C at 66.7%, arrow pointing up labeled "+16.7".
 
-Under the chart: one line showing the root-cause reasoning in a flow: `reviewer asks for tests -> make coder write tests -> reviewer has nothing to ask about`.
+Under the chart, a three-step flow:
+`Reviewer asks for tests -> make Coder write tests -> Reviewer has nothing to ask about`
 
 **Say:**
-Instead of telling the Reviewer "approve without tests" (wrong layer), I changed the Coder's instructions to write a regression test alongside the fix. Reviewer recall improved right away. Issue 815 went from 2 rounds to 1 round because the Coder brought the test the Reviewer would have asked for.
+The obvious fix was to tell the Reviewer to stop asking for tests. But that would swing it toward rubber-stamp territory. The better fix was to make the Coder write the tests in the first place. 22 of 25 real historical arrow fixes included tests too, so this actually matches the repo's culture. Reviewer recall jumped from 50 to 67. Issue 815 went from 2 rounds to 1 round because the Coder delivered what the Reviewer would have asked for.
 
 ---
 
-## Slide 18. Phase D: the surprise that came back
+## Slide 16. Phase D: the next problem
 
 **On slide:**
 
-- Sequential run. Memory accumulates across bugs.
-- Good news: memory actually helped. Reviewer recalibrated.
-- **Bad news: test_pass_rate dropped to 50%.**
-- Why: the Coder now writes tests. Sometimes they fail on its own fix. Reviewer can't tell (it doesn't run code).
-- The metrics pipeline caught this without us looking for it.
+Sequential run, memory accumulates.
+
+Good news:
+
+- Memory worked. Reviewer recalibrated after seeing past rejections.
+
+Bad news:
+
+- Test pass rate dropped to **50%**.
+- The Coder now writes tests. Sometimes they're broken (fail on its own fix).
+- The Reviewer can't catch this. It reads the diff but doesn't run code.
+
+**The metrics pipeline flagged it without us looking for it. That's the point.**
 
 **Visual:**
-Headline chart. Line showing `test_pass_rate` over the four phases:
+Line chart of `test_pass_rate` across the four phases:
+
 - Phase A: 67%
 - Phase B: 100%
 - Phase C: 100%
 - Phase D: **50%** (drop)
-Big red arrow annotating the Phase D drop with the caption: **"Coder writes broken tests. Reviewer approves anyway because it doesn't run code."**
+
+Red arrow annotating the Phase D point with the caption: **"Coder writes broken tests. Reviewer approves anyway because it doesn't run code."**
 
 **Say:**
-Phase D was the most interesting result because it made things worse. Memory accumulated across issues and did help the Reviewer calibrate. But now that the Coder writes tests, sometimes it writes a broken test. The Oracle catches the failing test. The Reviewer, which reads the diff but doesn't actually run code, approves anyway. Classic "coder tests its own homework". And the metric pipeline caught it without me looking for it, which is the whole point of having the watchdog alerts.
+Phase D was the most interesting result because it made things worse. We finally ran sequentially so memory could accumulate. Memory helped, the Reviewer did recalibrate. But now that the Coder writes tests, sometimes the test itself is broken. The Oracle catches it. The Reviewer reads the diff statically and doesn't run anything, so it approves anyway. Classic "Coder tests its own homework". The thing I love about this result is that the metric pipeline caught it without me looking for it. That's what the watchdog alerts are for. Each fix we made revealed the next problem, which is exactly how engineering actually goes.
 
 ---
 
-## Slide 19. What worked
+## Slide 17. What worked
 
 **On slide:**
 
@@ -406,7 +395,7 @@ A lot worked. The Oracle is what made everything else measurable. Git history he
 
 ---
 
-## Slide 20. What didn't work the first time
+## Slide 18. What didn't work the first time
 
 **On slide:**
 
@@ -425,7 +414,7 @@ Plenty didn't work the first time. The "make the Reviewer less picky" approach s
 
 ---
 
-## Slide 21. Safety rails that caught themselves
+## Slide 19. Safety rails that caught themselves
 
 **On slide:**
 
@@ -443,7 +432,7 @@ I built a bunch of guardrails up front. Several fired during development, which 
 
 ---
 
-## Slide 22. What's next
+## Slide 20. What's next
 
 **On slide:**
 
@@ -462,7 +451,7 @@ The top item is specifically for the Phase D defect. If we run the Coder's own t
 
 ---
 
-## Slide 23. Summary
+## Slide 21. Summary
 
 **On slide:** *(big font, no bullets)*
 
@@ -478,7 +467,7 @@ The one-sentence version: we built a way for two AIs to teach each other, ground
 
 ---
 
-## Slide 24. Thank you
+## Slide 22. Thank you
 
 **On slide:**
 
