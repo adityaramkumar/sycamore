@@ -2,10 +2,19 @@
 
 One slide per section. Each slide has:
 
-- **On slide**: bullets or a diagram to show.
-- **Say**: speaker notes in plain language. Audience is high schoolers who understand what agents and code review are.
+- **Title**: usually a takeaway sentence, not a topic label.
+- **On slide**: minimal text, 4 bullets max, ~6 words each.
+- **Visual**: what to draw, screenshot, or chart. Most are doable with Google Slides shapes, Google Sheets charts, or a screenshot.
+- **Say**: speaker notes. Carry the content that isn't on the slide.
 
-Suggested length: 23 slides, roughly 18 to 22 minutes. Phase D at slide 17 is the most interesting moment. If you need to cut for time, slides 2+3 and 9+10 can each merge into one slide.
+23 slides, about 18 to 22 minutes. Slide 17 (Phase D) is your strongest moment; if you need to cut, merge 2+3 and 9+10.
+
+Design principles used here:
+
+- Audience should listen, not read. Text on the slide should fit in 5 seconds.
+- One visual per slide, centered, fills most of the space.
+- Titles do storytelling work ("The reviewer was the bottleneck") rather than labeling work ("Reviewer analysis").
+- If a chart and text both fit, drop the text.
 
 ---
 
@@ -14,52 +23,62 @@ Suggested length: 23 slides, roughly 18 to 22 minutes. Phase D at slide 17 is th
 **On slide:**
 
 - Co-Optimizing an AI Coder and an AI Reviewer
-- Subtitle: teaching two AI helpers to learn from each other, without cheating
-- Your name, date
+- Your name | date
+
+**Visual:**
+Simple icon graphic: two robots (or speech bubbles) facing each other, one labeled "Coder", one labeled "Reviewer". Below them a small icon of a test tube or green checkmark labeled "Oracle". No other text.
 
 **Say:**
-Today I'm going to walk through a project where I built a system that lets two AI helpers, one that writes code and one that reviews code, learn from each other using their past conversations. I'll tell you what I found out, including one big surprise.
+Today I'm walking through a project where two AI helpers, one that writes code and one that reviews it, learn from each other using their past conversations. I'll show you what I built, what I measured, and one big surprise.
 
 ---
 
-## Slide 2. The problem
+## Slide 2. Two AIs talking to each other
 
 **On slide:**
 
-- AI Coder: reads a bug report, writes a fix.
-- AI Reviewer: reads the fix, approves or asks for changes.
-- They go back and forth until the Reviewer is happy.
-- Today these two are trained totally separately. They never learn from their conversations.
+- Coder writes a fix.
+- Reviewer approves or asks for changes.
+- They iterate until done.
+- Today, neither learns from the conversation.
+
+**Visual:**
+A simple horizontal flow with three boxes: `Issue -> Coder -> Reviewer -> (approve | revise)`. Use arrows. A small loop arrow from Reviewer back to Coder labeled "feedback".
 
 **Say:**
-Picture a junior engineer and a senior engineer working on a bug together. The junior writes a fix, the senior reviews it, they iterate until the fix is merged. That's exactly how two AI helpers work too. The question my worktrial asked: can we use the transcripts of those conversations to make both AIs better over time?
+Picture a junior engineer and a senior engineer working on a bug. Junior writes a fix, senior reviews, they iterate. That's exactly how two AI helpers work too. The interesting question: can we use the transcripts of those conversations to make both AIs better over time?
 
 ---
 
-## Slide 3. The trap
+## Slide 3. The trap: they can agree on nonsense
 
 **On slide:**
 
-- If we only use the Reviewer's opinion as "is this good?", the Coder can learn to write code that *sounds* good to the Reviewer without actually working.
-- Like writing an essay that sounds smart to please the teacher, without really learning the material.
+- If the Reviewer is our only grader, the Coder learns to please it.
+- Not to actually fix the bug.
 - We need an outside judge.
 
+**Visual:**
+A Venn diagram with two circles: "Reviewer approves" and "Tests actually pass". The overlap is tiny. Label the non-overlapping "Reviewer approves" part with a question mark.
+
 **Say:**
-Here's the subtle part. If the only grade we give the Coder is the Reviewer's thumbs up, the Coder can learn to game the Reviewer. They can happily agree with each other while the code is still broken. Without an outside judge we have no way to tell if the system is actually getting better or just getting better at flattering itself.
+Here's the subtle part. If the only grade we give the Coder is the Reviewer's thumbs up, the Coder can learn to game the Reviewer. They can happily agree with each other while the code is still broken. We need an outside judge that doesn't care about their feelings.
 
 ---
 
-## Slide 4. The target: arrow
+## Slide 4. 25 real bugs, 1 small library
 
 **On slide:**
 
-- arrow is a small Python date/time library.
-- 25 real historical bugs, pinned to a commit before any of them were fixed.
-- Example bug: `humanize()` says "16 days" is "a month" but it should say "2 weeks".
-- All the real fixes exist on GitHub, so we have a ground-truth answer key.
+- `arrow-py/arrow`: Python date/time library.
+- 25 real historical bugs.
+- Pinned to a commit before any were fixed.
+
+**Visual:**
+Screenshot of the arrow GitHub repo or a highlighted GitHub issue (issue #1240 is a good one: "humanize reports '16 days' as 'a month'"). Alternative: arrow logo + three stats: "25 bugs", "800 commits", "2019 baseline".
 
 **Say:**
-To test this we needed a real codebase with real bugs. arrow is a small Python library for dates and times, and it has a long history of closed bug reports with their fix commits on GitHub. We pinned it to an old commit where none of the bugs had been fixed yet, and pointed our AI helpers at the 25 bugs we wanted to fix.
+We needed a real codebase with real bugs. arrow is a small Python library for dates and times with a long history of closed bug reports on GitHub. We pinned it to an old commit before the bugs were fixed, and pointed our AI helpers at 25 of them.
 
 ---
 
@@ -68,58 +87,57 @@ To test this we needed a real codebase with real bugs. arrow is a small Python l
 **On slide:**
 
 ```
-Issue: humanize() says "16 days" should be "a month" but should say "2 weeks"
-
-Round 1:
-  Coder's fix: <some code>
-  Reviewer: "please add a test"
-
-Round 2:
-  Coder's fix: <updated code with a test>
-  Reviewer: "approved"
+issue + [(fix_1, review_1), (fix_2, review_2), ...]
 ```
 
+Just the conversation, saved as JSON.
+
+**Visual:**
+Show an actual trace snippet. Use a short real one:
+
+```json
+{
+  "issue_number": 815,
+  "rounds": [
+    { "round": 1, "diff": "...", "approved": false,
+      "comments": ["add a test for Czech week"] },
+    { "round": 2, "diff": "...", "approved": true }
+  ]
+}
+```
+
+Highlight "approved" in each round with a red/green color.
+
 **Say:**
-Every time the Coder and Reviewer talk, we save the full conversation to a file. That file is called a trace. The whole exercise is basically: how much can we learn from these traces to make future runs better?
+Every time the two AIs talk, we save the whole conversation to a file. We call it a trace. The whole exercise is basically: can we learn enough from these traces to make the next run better?
 
 ---
 
-## Slide 6. What we built (big picture)
+## Slide 6. The system in one picture
 
-**On slide:**
+**On slide:** *(no bullets, diagram only)*
 
-```
-coder prompt gets:
-  + git history (similar past fixes from this repo)
-  + lessons notebook (distilled from past traces)
-  + reviewer feedback (from the previous round)
-
-reviewer prompt gets:
-  + git history (same retrieval, so it knows the repo's norms)
-  + calibration notebook (when it was right, when it was wrong)
-
-every fix -> ORACLE (runs real tests, hidden from reviewer)
-          -> REVIEWER (gives verdict + comments)
-
-after the issue: distill the trace into memory updates
-```
+**Visual:**
+The architecture diagram from `docs/DESIGN.md`. Screenshot the mermaid graph. Highlight with a red box or arrow the **"HIDDEN from reviewer"** edge from Oracle to Trace Store, and add a callout: "this is the one thing neither AI can fool".
 
 **Say:**
-Five pieces. An Oracle that runs the real pytest tests and is the one thing nobody can fool. A git-history retrieval that shows both agents similar past fixes from this repo. A small notebook for each agent with distilled lessons. A distillation step that fills those notebooks after each issue. And safety rules on top to prevent the two AIs from colluding.
+Five pieces. An Oracle that runs real pytest tests and is the one thing nobody can fool. A git-history retrieval that shows both agents similar past fixes from this repo. A small notebook for each agent with distilled lessons. A distillation step that fills those notebooks after each issue. And safety rails on top.
 
 ---
 
-## Slide 7. The oracle is the core insight
+## Slide 7. The Oracle: our teacher
 
 **On slide:**
 
-- Runs the real pytest tests on every fix.
+- Runs real pytest tests on every fix.
 - Result is **hidden from the Reviewer**.
-- Without it, the two AIs just grade each other in a vacuum.
-- With it, we have an honest answer to "did the code actually work?" every round.
+- Can't be fooled by a fast-talking AI.
+
+**Visual:**
+Three boxes: the Coder's fix goes to both the Reviewer (left) and the Oracle (right). Over the Oracle, draw a lock icon. Label: "hidden from reviewer". The Reviewer outputs "approve/reject", the Oracle outputs "pass/fail".
 
 **Say:**
-This is the single most important piece. Tests don't lie. They don't care how confident the Coder sounded or how picky the Reviewer was. They just run and pass or fail. We hide that result from the Reviewer specifically so the Reviewer can't cheat by just copying the Oracle's answer. We want the Reviewer to have its own opinion, and then we compare its opinion to the Oracle afterward.
+This is the single most important piece. Tests don't lie. They just run and pass or fail. We hide their result from the Reviewer on purpose. We want the Reviewer to have its own opinion, and then we compare that opinion to the Oracle afterward.
 
 ---
 
@@ -127,45 +145,52 @@ This is the single most important piece. Tests don't lie. They don't care how co
 
 **On slide:**
 
-- Target: 5 curated bugs chosen to span all the main categories (humanize, locale, parser).
-- One of them (#1240) is known-hard.
-- Two arms:
-  - **FULL**: everything turned on (history, memory, distillation).
-  - **ABLATE**: everything turned off.
-- Same model (Claude Sonnet), same commit, same seed.
-- Up to 3 rounds per issue.
+| | FULL | ABLATE |
+|---|---|---|
+| Git history | on | off |
+| Memory | on | off |
+| Distillation | on | off |
+
+Same model, same bugs, same seed.
+
+**Visual:**
+The table above, rendered clean. Next to it, a row of 5 little bug icons (for 5 issues) with arrows into FULL and ABLATE boxes.
 
 **Say:**
-This is an ablation study. Standard experimental technique: hold everything constant and turn off the features you care about, then compare. If FULL beats ABLATE, the features helped. If they're the same, they didn't. We picked issues that spanned all the bug categories in the dataset, plus one known-hard case so we'd see where the system struggles.
+Standard ablation study. Two versions of the system. One has all the features turned on. One has them all turned off. Same AI model, same bugs, same random seed. Only difference is the features we're testing.
 
 ---
 
-## Slide 9. Metrics and why
+## Slide 9. Metrics: what we measure
 
 **On slide:**
 
-- `test_pass_rate`: did the code actually work? (headline, cannot be faked)
-- `first_pass_test_pass_rate`: how often did the Coder solve it without help?
-- `reviewer_precision`: when the Reviewer says approve, is it actually correct?
-- `reviewer_recall`: when the code is actually correct, does the Reviewer recognize it?
-- Balance alerts: catch reviewer-rubber-stamping OR reviewer-over-asking.
+- `test_pass_rate`: did it actually work? (headline)
+- `reviewer_precision`: when the Reviewer says yes, is it right?
+- `reviewer_recall`: does the Reviewer recognize good code?
+- `balance_gap`: do the two AIs quietly agree on something wrong?
+
+**Visual:**
+Dashboard mockup. One big number on the left (test_pass_rate, like "100%"). Four smaller boxes on the right with mini labels (precision, recall, fpr, balance_gap). Use green/red fill to show "good" vs "bad" ranges.
 
 **Say:**
-The headline number is grounded in the real tests. The reviewer can't inflate it. The per-agent numbers let us blame the right one when something goes wrong. And the balance alerts specifically look for the "two AIs agree while tests disagree" failure mode.
+The headline metric is oracle-grounded. The reviewer can't inflate it. The three smaller ones let us blame the right AI when something goes wrong. The last one is a watchdog for the "two AIs agree on nonsense" failure.
 
 ---
 
-## Slide 10. Why this set of metrics is good
+## Slide 10. Why this set is good
 
 **On slide:**
 
-- Only one metric matters for correctness; everything else is supporting detail.
-- Per-agent breakdown tells us which AI is improving or falling behind.
-- Deliberately skip: raw approval rate (gameable), diff size (volume, not correctness).
-- Watchdog alerts are directional: reward hacking vs over-asking are different problems.
+- **One** metric grounded in reality.
+- **Per-agent** breakdown tells us who's at fault.
+- **Watchdog** catches pathologies.
+
+**Visual:**
+Pyramid or funnel diagram. Wide bottom = noisy signals (approval rate, diff size, comments). Narrow top = the one thing we trust (test_pass_rate). Arrow labeled "ground truth".
 
 **Say:**
-A common trap in ML evals is measuring the wrong thing. If we'd used raw approval rate, the Reviewer could just approve everything and we'd have thought we were winning. Grounding in tests makes it impossible to game the headline. The per-agent breakdown is what let me catch the surprise I'll show in a few slides.
+A common trap in ML evals is measuring the wrong thing. If we'd used raw approval rate, the Reviewer could approve everything and we'd look like we're winning. Grounding in tests makes it ungameable. The per-agent breakdown is what let me catch the surprise I'll show in a few slides.
 
 ---
 
@@ -173,123 +198,138 @@ A common trap in ML evals is measuring the wrong thing. If we'd used raw approva
 
 **On slide:**
 
-- Sequential: 1 issue at a time, ~6 minutes each, ~30 min per arm, ~60 min total for 2 arms.
-- Parallel: 10 git worktrees (one per worker), all running at once.
-- Wall time dropped from ~60 min to ~20 min.
-- Tradeoff: each worker has a fresh memory, so we don't test memory accumulation in parallel mode.
+- 10 copies of the repo, one per worker.
+- Wall time: 60 min sequential, 20 min parallel.
+
+**Visual:**
+Side-by-side comparison:
+- Left: a single horizontal bar labeled "Sequential: ~60 min" broken into 10 colored segments (one per issue).
+- Right: 10 stacked short bars labeled "Parallel: ~20 min", all starting at 0.
+Label the gap: "3x speedup".
 
 **Say:**
-Running 5 bugs sequentially in both arms would take an hour. To speed that up I used a git feature called worktrees, which lets you have multiple checked-out copies of the same repo. Each worker ran in its own copy, so they didn't step on each other's files. Ten workers in parallel got us from 60 minutes down to 20. The tradeoff is that memory doesn't accumulate across parallel workers, so for measuring memory specifically we'd need to run sequentially.
+Running 10 bugs one at a time takes about an hour. To speed that up I used git worktrees, which are 10 checked-out copies of the same repo. Each worker ran in its own copy so they didn't step on each other. Ten workers in parallel cut wall time by about 3x.
 
 ---
 
-## Slide 12. Phase A: integration test (Haiku, 3 bugs)
+## Slide 12. Phase A: integration test (Haiku)
 
 **On slide:**
 
-- First real run after pipeline came together.
-- Did the whole system work end-to-end? Yes.
-- Caught real bugs in my own system:
-  - The Coder used its shell to run `git checkout master`, moving HEAD off our pinned commit.
-  - Empty rounds (Coder gave up) were being counted as "Reviewer over-asked", wrong.
+- 3 bugs.
+- Did the plumbing work? Yes.
+- Caught 2 bugs in my own system.
+
+**Visual:**
+A split panel:
+- Left: green checkmark and "Pipeline works".
+- Right: two red bug icons labeled "Coder cheated with git checkout" and "Empty rounds miscounted".
 
 **Say:**
-The first run was mostly about finding bugs in my own system, not bugs in arrow. And it did. My Coder was secretly cheating by using its shell access to move the repo to a different version. My metrics were miscounting rounds where the Coder produced nothing. Both got fixed before the real measurement.
+The first run was mostly about finding bugs in my own system, not bugs in arrow. And it did. My Coder was cheating with its shell access. My metrics were miscounting empty rounds. Both got fixed before the real measurement.
 
 ---
 
-## Slide 13. Phase B: the ablation (Sonnet, 5 bugs)
+## Slide 13. Phase B: the ablation
 
 **On slide:**
 
-| Metric | FULL | ABLATE |
+- Both arms: 100% bugs fixed.
+- FULL slightly faster (1.2 rounds vs 1.4).
+- But look at reviewer recall.
+
+**Visual:**
+Grouped bar chart. X-axis: 4 metrics (`test_pass_rate`, `rounds_to_pass`, `precision`, `recall`). Y-axis: value. Two bars per metric: FULL (blue) and ABLATE (gray).
+- `test_pass_rate`: both 100%
+- `rounds_to_pass`: 1.2 vs 1.4
+- `precision`: both 100%
+- **`recall`: 50% vs 57%, both short.** Highlight this column.
+
+**Say:**
+Phase B was the real measurement. On the headline, both arms fixed all 5 bugs. Looked boring. But the per-agent breakdown told a different story. Reviewer recall was only around half. Half the time the Coder wrote code that actually passed tests, the Reviewer rejected it anyway. That's a big finding the headline alone would have hidden.
+
+---
+
+## Slide 14. One bug up close: issue 1240
+
+**On slide:**
+
+- Bug: `humanize(16 days)` should say "2 weeks", not "a month".
+
+| Round | Diff | Oracle | Reviewer |
+|---|---|---|---|
+| 1 | 821 chars | **PASS** | **REJECT** (28 comments) |
+| 2 | 821 chars | PASS (cached) | REJECT |
+| 3 | 821 chars | PASS (cached) | REJECT |
+
+**Visual:**
+Screenshot of a real diff (arrow's fix for 1240 is public). Next to it, an email-or-comment bubble with the Reviewer's first few rejection comments. Big red X next to "Approved?" but a big green check next to "Tests pass?"
+
+**Say:**
+This is the clearest example of the problem. The Coder wrote a fix. The Oracle said it worked. The Reviewer rejected it three times in a row, asking for more edge cases and more tests. If I'd only had the Reviewer's verdict, I'd have concluded the Coder was bad. With the Oracle, I could see the Coder was fine and the Reviewer was the picky one.
+
+---
+
+## Slide 15. The surprise: Reviewer is too picky
+
+**On slide:**
+
+- **7 of 15 rounds: good fix, rejected anyway.**
+- Precision 100%, recall 50%.
+
+**Visual:**
+A 2x2 confusion matrix:
+
+|  | **Tests PASS** | **Tests FAIL** |
 |---|---|---|
-| `test_pass_rate` | 100% | 100% |
-| `first_pass_test_pass_rate` | 80% | 80% |
-| `avg_rounds_to_oracle_pass` | **1.2** | 1.4 |
-| `reviewer_recall` | 50% | 57% |
-| `balance_gap` | 50% | 43% |
+| **Reviewer approves** | 5 (true approval) | 0 |
+| **Reviewer rejects** | **7 (false rejection, BIG)** | 3 (true rejection) |
 
-- Ceiling effect on pass rate: all 5 bugs got fixed by both arms.
-- Small efficiency win for FULL (history helped Coder reach passing fix faster).
-- **The real story is in reviewer_recall**.
+Highlight the 7 in red. Big label next to it: "the problem".
 
 **Say:**
-Phase B was the real measurement. The headline looked boring: both arms fixed 100% of the bugs. But when I broke it down by agent I saw something interesting. Reviewer recall was only 50%. That means half the time the Coder wrote code that actually passed tests, the Reviewer rejected it anyway. That's a major finding the headline metric alone would have hidden.
+So the Reviewer is too picky. Not lazy, not dishonest. Nitpicky. It kept asking for more tests even when the fix worked. Interestingly, the real arrow fixes usually include tests too, so the Reviewer's instinct was reasonable. The problem was the Coder wasn't meeting it.
 
 ---
 
-## Slide 14. Example datapoint: issue 1240
+## Slide 16. Phase C: fix the Coder, not the Reviewer
 
 **On slide:**
 
-- Bug: `humanize()` says "16 days" should be "a month" but should say "2 weeks".
-- FULL arm:
-  - Round 1: Coder wrote an 821-char fix. **Oracle said tests pass**. Reviewer rejected with 28 comments asking for more edge cases.
-  - Round 2: Coder submits the same fix again. Oracle still passes. Reviewer still rejects.
-  - Round 3: Reviewer still rejects.
-- The Coder's fix was correct. The Reviewer just wouldn't accept it.
+- Tell the Coder to write tests up front.
+- Recall jumped 50% to 67%.
+
+**Visual:**
+Two bars showing `reviewer_recall`:
+- Before (Phase B): 50%
+- After (Phase C): 66.7%
+Arrow pointing up, labeled "+16.7".
+
+Under the chart: one line showing the root-cause reasoning in a flow: `reviewer asks for tests -> make coder write tests -> reviewer has nothing to ask about`.
 
 **Say:**
-This is the clearest example of the problem. The Coder wrote a fix. The Oracle said it worked. The Reviewer rejected it three times in a row, asking for more edge cases and more tests. If I'd only had the Reviewer's verdict to go on, I'd have concluded the Coder was bad at this bug. With the Oracle, I could see the Coder was fine and the Reviewer was the one being unreasonable.
+Instead of telling the Reviewer "approve without tests" (wrong layer), I changed the Coder's instructions to write a regression test alongside the fix. Reviewer recall improved right away. Issue 815 went from 2 rounds to 1 round because the Coder brought the test the Reviewer would have asked for.
 
 ---
 
-## Slide 15. The surprise: Reviewer over-asks
+## Slide 17. Phase D: the surprise that came back
 
 **On slide:**
 
-- 7 of 15 non-empty rounds: Coder wrote a passing fix, Reviewer rejected it anyway.
-- Not reward hacking. The opposite: "over-asking".
-- Old alert name was misleading. Fixed: now we have separate alerts for each direction.
-- Real fix: make the Coder write tests up front so the Reviewer has nothing to complain about.
+- Sequential run, memory accumulates across issues.
+- Memory helped. **But test_pass_rate dropped to 50%.**
+- The Coder writes tests that fail on its own fix.
+
+**Visual:**
+Headline chart. Line showing `test_pass_rate` over the four phases:
+- Phase A: 67%
+- Phase B: 100%
+- Phase C: 100%
+- Phase D: **50%** (drop)
+Next to the Phase D point, a caption: "Coder tests its own homework".
 
 **Say:**
-So my Reviewer was too picky. Not lazy, not dishonest, just nitpicky. It kept asking for more tests even when the fix worked. The question was how to fix that. My first instinct was to tell the Reviewer "approve even without tests", but that would swing it to rubber-stamp territory. Much better idea: make the Coder write tests as part of the fix. 22 of 25 real historical fixes in the repo actually include tests, so the Reviewer's instinct to ask for them was reasonable. The problem was the Coder wasn't meeting it.
-
----
-
-## Slide 16. Phase C: does the fix work?
-
-**On slide:**
-
-- Added "write a regression test" to the Coder's instructions.
-- Kept the Reviewer prompt balanced.
-- Re-ran the two hardest cases from Phase B.
-
-| | Phase B FULL | Phase C FULL |
-|---|---|---|
-| 1240 | 3 rounds, rejected | **2 rounds, approved** |
-| 815 | 2 rounds, approved | **1 round, approved** |
-| `reviewer_recall` | 50% | 66.7% |
-
-- Verified the Coder actually wrote a test on 815 (the diff touches `tests/`).
-
-**Say:**
-Phase C confirmed it. On issue 815, the Coder wrote the test up front, and the Reviewer approved on round 1 instead of round 2. On 1240, it got to approved in 2 rounds instead of failing all 3. Reviewer recall went from 50% to 66.7%. Not perfect, but moving in the right direction.
-
----
-
-## Slide 17. Phase D: sequential memory test (4 issues)
-
-**On slide:**
-
-- First run that actually tests whether memory accumulates across issues.
-- 4 issues in sequence, one FULL-arm process.
-- **Two new findings, one good, one bad.**
-
-Good:
-
-- Memory does accumulate and does help. After issue 815 produced three "I over-asked" calibration cases, the reviewer on the next issue (1224) had one of those cases in its prompt and approved round 1 correctly.
-- The reviewer freeze fired with the new directional reason `reviewer_over_asking` instead of the old misleading `reward_hacking`. The guardrail works.
-
-Bad:
-
-- **Test pass rate dropped from 100% to 50%.**
-- On two issues the Coder wrote a regression test that FAILED on its own fix. Oracle reported 217/218 and 153/154. Reviewer approved both anyway because the reviewer doesn't actually run the tests.
-
-**Say:**
-Phase D is the most interesting result we got because it made things worse. We finally ran sequentially so memory could accumulate. Memory did help the Reviewer recalibrate. But it also exposed a new problem: now that the Coder is writing tests, sometimes it writes a broken test. The Reviewer can't catch that because the Reviewer reads the diff statically and doesn't execute anything. So the Reviewer approved code where the Coder's own test was failing. That's exactly the "coder tests its own homework" loophole we could have predicted but hadn't seen in the data before.
+Phase D was the most interesting result because it made things worse. For the first time I ran sequentially, so memory could accumulate. Memory did help the Reviewer calibrate. But writing tests opened a new hole: sometimes the Coder writes a broken test. The Oracle catches the failing test, but the Reviewer, which doesn't actually run code, approves anyway. Classic "coder tests its own homework". The metric pipeline caught it without me looking for it, which is the whole point.
 
 ---
 
@@ -297,29 +337,36 @@ Phase D is the most interesting result we got because it made things worse. We f
 
 **On slide:**
 
-- **The Oracle**. The single biggest unlock. Without it we'd never have caught either the Reviewer over-asking or the broken-test loophole.
-- **Git history for both agents**. Coder uses it to see past fix shapes. Reviewer uses it to know the repo's norms. Small efficiency win (~0.2 rounds faster to pass in Phase B).
-- **Memory accumulation** (Phase D). Reviewer actually recalibrated after seeing past false-rejections in its prompt.
-- **Coder writing tests alongside the fix** (Phase C). Took FULL/815 from 2 rounds to 1 round.
-- **Parallel worktrees**. 3x speedup with no downside beyond memory isolation.
-- **Directional alerts**. Phase D's freeze fired with the correct `reviewer_over_asking` reason, not a misleading label.
+- The Oracle.
+- Git history for both AIs.
+- Memory that actually accumulated.
+- Directional alerts.
+- Parallel worktrees.
+
+**Visual:**
+Five green checkmarks in a row or column, each with a short label. Could use emoji icons: (oracle) test tube, (git history) branches, (memory) notebook, (alerts) siren, (parallel) lightning bolt.
 
 **Say:**
-A lot worked. The Oracle is what made everything else measurable. Git history helped both agents. Memory really did accumulate when we ran sequentially. The Coder writing tests fixed the over-asking problem in Phase C. And the directional alerts correctly named every pathology we saw.
+A lot worked. The Oracle is what made everything else measurable. Git history helped both agents see the repo's patterns. Memory really did accumulate when we ran sequentially. And the directional alerts correctly named every pathology we saw.
 
 ---
 
-## Slide 19. What didn't work (first attempts)
+## Slide 19. What didn't work the first time
 
 **On slide:**
 
-- First tried to tell the Reviewer "don't reject for missing tests". Overcorrected toward rubber-stamp. Reverted.
-- Anti-flailing rules tuned for Haiku broke Sonnet's thorough exploration. Relaxed.
-- **Phase D revealed a new defect: the Coder sometimes writes broken regression tests.** Tests fail on its own fix. Reviewer can't catch that because it reads statically.
-- The Coder still sometimes skips the test on genuinely hard bugs (1240). Open.
+- Fixed over-asking from the wrong side.
+- Anti-flailing rules too aggressive.
+- Coder writes broken tests (Phase D).
+
+**Visual:**
+Three items with red X marks. Next to each, a smaller "->" with a green arrow showing the later fix. Example:
+- Told Reviewer "don't ask for tests" -> made Coder write tests instead
+- Killed Sonnet's exploration at turn 12 -> raised budget
+- Coder's own tests sometimes fail -> **still open**
 
 **Say:**
-Plenty of stuff didn't work the first time. I initially patched the over-asking from the Reviewer side. Wrong layer. The Coder writing tests was the better answer. My early anti-flailing rules were tuned for Haiku and accidentally killed Sonnet's thorough exploration. And Phase D uncovered that the "Coder writes tests" fix introduced a brand-new problem: sometimes the test itself is broken, and the Reviewer approves the diff anyway because the Reviewer doesn't run code. That's the next thing to fix.
+Plenty didn't work the first time. The "make the Reviewer less picky" approach swung it toward rubber-stamp. The Coder-writes-tests fix worked but introduced Phase D's broken-test problem. Each fix made the next problem visible, which is how engineering usually goes.
 
 ---
 
@@ -327,14 +374,17 @@ Plenty of stuff didn't work the first time. I initially patched the over-asking 
 
 **On slide:**
 
-- **Reviewer Freeze** fired in Phase D after 815 with the correct directional reason `reviewer_over_asking(0.75-0.25>0.3)`.
-- **Held-out bugs**: 7 of 25 never feed distillation.
-- **Asymmetric information**: Oracle never seen by Reviewer, Reviewer notebook never seen by Coder. Verified by re-reading the loop code.
-- **Post-Coder HEAD check** caught the Coder sneakily running `git checkout master` in Phase A.
-- **Empty-diff exclusion** caught a metric-layer bug that was misattributing "Coder did nothing" to "Reviewer over-asked" in Phase A.
+- Reviewer freeze.
+- Held-out bugs.
+- Asymmetric information.
+- HEAD drift check.
+- Empty-diff filter.
+
+**Visual:**
+5 small icons in a grid (or a row). Each icon represents one rail, with a small green check next to it for "fired correctly during development". Can use shield icons in Google Slides.
 
 **Say:**
-I built a bunch of guardrails up front to prevent pathological dynamics. Several of them actually fired during development, which is how I know they work. The HEAD check caught the Coder cheating. The empty-diff filter caught a real metric bug. Phase D's Reviewer Freeze triggered with the correctly-named directional reason after splitting the alerts. These are the kind of defenses that only earn their keep when they catch something, and they did.
+I built a bunch of guardrails up front. Several fired during development, which is how I know they work. The HEAD check caught the Coder cheating. The empty-diff filter caught a metric bug. Phase D's Reviewer freeze fired with the correctly-named directional reason. Guardrails that never fire are theater; these earned their keep.
 
 ---
 
@@ -342,79 +392,88 @@ I built a bunch of guardrails up front to prevent pathological dynamics. Several
 
 **On slide:**
 
-- **Highest priority: Oracle-side verification that the Coder's new tests actually fail on the pre-fix code.** Closes the Phase D loophole directly. ~30 lines.
-- Tighten Coder prompt: "do not submit if your test is failing". Already in the prompt, make it louder.
-- Dedupe calibration cases per issue so one hard bug doesn't over-weight the Reviewer's memory.
-- Value-function head (AlphaGo-style P(tests pass) estimator).
-- Reviewer `git blame` on modified lines specifically.
-- Cross-repo: does this transfer to a different library?
+Top priority:
+- Run Coder's tests on the pre-fix code.
+
+Stretch:
+- Value-function head (AlphaGo-style).
+- Cross-repo transfer.
+
+**Visual:**
+A vertical priority list. The top item in a red box labeled "next 2 weeks". Below it, a couple of stretch items in gray labeled "2 months". Arrow pointing forward or timeline icon.
 
 **Say:**
-The top item is specifically for the Phase D defect. If we run the Coder's own tests against the pre-fix code, we catch broken tests structurally. Thirty lines. Would close the loophole before any of the bigger ideas. Then the usual bigger stretches: a value function, cross-repo transfer, better retrieval. But the next commit is the oracle-side check.
+The top item is specifically for the Phase D defect. If we run the Coder's own test against the pre-fix code and check that it fails, we catch broken tests structurally. Thirty lines. Then the usual stretches: a value function, cross-repo transfer. But the next commit is the oracle-side check.
 
 ---
 
 ## Slide 22. Summary
 
-**On slide:**
+**On slide:** *(big font, no bullets)*
 
-- Two AI helpers teach each other using their past conversations.
-- Grounded by real tests (the Oracle), which keeps them honest.
-- We found the Coder was fine, the Reviewer was too picky.
-- Fixed it by making the Coder write tests up front (addressing the root cause, not the symptom).
-- The Oracle + ablations + directional alerts are the key ingredients that made this measurable.
+> Two AIs teach each other.
+> Real tests keep them honest.
+> Every fix revealed the next one.
+
+**Visual:**
+Just the three lines above, centered, large font. Maybe a small closing icon at the bottom (two gears interlocking, or the Coder-Reviewer-Oracle trio from slide 1 redrawn).
 
 **Say:**
-The one-sentence version: we built a way for two AIs to teach each other while keeping them grounded by real tests, and we found out the Coder was doing its job but the Reviewer was too picky. The main lesson for me was that you can't just trust the agents grading each other. You need an outside judge that doesn't care about their feelings.
+The one-sentence version: we built a way for two AIs to teach each other, grounded by real tests that keep them honest. Every defect we fixed made the next one visible. For me the main lesson is that you cannot trust the agents grading each other. You need an outside judge that doesn't care about their feelings, and you need metrics that decompose which AI is at fault when things go wrong.
 
 ---
 
-## Slide 23. Thank you / questions
+## Slide 23. Thank you
 
 **On slide:**
 
-- Thank you!
+- Thank you
 - Repo link or QR code
 - Questions?
+
+**Visual:**
+QR code to your GitHub repo. Your name + contact. Nothing else.
+
+**Say:**
+Thank you! Happy to take questions.
 
 ---
 
 # Appendix: numbers and citations
 
-Useful pieces to have on hand if someone asks.
+Useful to have on hand for Q&A.
 
 ## Phase B raw numbers
 
-- 5 issues (1056, 815, 1224, 1240, 607) across 2 arms.
-- 10 parallel workers, 20 minutes wall time.
+- 5 issues (1056, 815, 1224, 1240, 607), 2 arms, 10 parallel workers, 20 min wall.
 - FULL: `test_pass_rate=100%`, `first_pass=80%`, `avg_rounds_to_pass=1.2`, `reviewer_recall=50%`, `balance_gap=50%`.
 - ABLATE: same `test_pass_rate=100%`, same `first_pass=80%`, `avg_rounds_to_pass=1.4`, `reviewer_recall=57%`, `balance_gap=43%`.
 
 ## Phase C raw numbers
 
-- 2 issues (1240, 815) across 2 arms, 4 parallel workers, 15 minutes.
+- 2 issues (1240, 815), 2 arms, 4 parallel workers, 15 min.
 - FULL: `test_pass_rate=100%`, `first_pass=100%`, `reviewer_recall=66.7%`, `balance_gap=33.3%`.
 - ABLATE: `test_pass_rate=50%` (1240 still fails without context).
 
 ## Phase D raw numbers
 
 - 4 issues (1056, 815, 1224, 607) sequential, single FULL process, 22 min wall.
-- `test_pass_rate=50%` (2/4), `first_pass_test_pass_rate=50%`, `approval_rate=75%`.
+- `test_pass_rate=50%` (2/4), `first_pass=50%`, `approval_rate=75%`.
 - `reviewer_precision=33.3%`, `reviewer_recall=25%`, `reviewer_fpr=100%`.
-- Reviewer frozen after issue 815 with reasons: `precision_below_floor(0.00<0.6)` and `reviewer_over_asking(0.75-0.25>0.3)`.
-- Coder memory ended with 1 lesson, reviewer memory with 3 false_rejection cases from 815.
-- New defect: on 1056 and 607 the coder wrote tests that failed on its own fix, and the reviewer approved anyway. Two `false_approval` events.
+- Reviewer frozen after 815 with `precision_below_floor(0.00<0.6)` and `reviewer_over_asking(0.75-0.25>0.3)`.
+- Memory ended with 1 coder lesson, 3 reviewer false_rejection cases from 815.
+- New defect on 1056 and 607: coder's own added tests failed; reviewer approved anyway.
 
 ## Stability rules
 
-- Reviewer freeze: triggers if precision < 0.6, approval rate hits saturation, or either directional balance-gap exceeds 0.30.
+- Reviewer freeze: precision < 0.6, approval rate saturation, or either directional balance gap > 0.30.
 - Held-out: 7 of 25 issues (default seed 42).
 - Alternating updates: odd training issue updates the Coder, even updates the Reviewer.
-- Category-balanced retrieval: always inject at least one memory bullet from a different category than the current issue.
+- Category-balanced retrieval: always inject at least one memory bullet from a different category.
 
 ## Docs to point to
 
 - `docs/OVERVIEW.md`: plain-language start-here doc.
 - `docs/DESIGN.md`: the technical design.
 - `docs/RESULTS.md`: Phase A, B, C, D writeups with all the numbers.
-- `docs/RESPONSE.md`: direct answer to the original worktrial prompt.
+- `docs/RESPONSE.md`: direct answer to the worktrial prompt.
