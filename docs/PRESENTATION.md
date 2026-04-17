@@ -42,11 +42,14 @@ Today I'm walking through a project where two AI helpers, one that writes code a
 - They iterate until done.
 - Today, neither learns from the conversation.
 
+**Big question on the slide (bottom, larger font):**
+**Can we use those conversations to make both AIs better?**
+
 **Visual:**
-A simple horizontal flow with three boxes: `Issue -> Coder -> Reviewer -> (approve | revise)`. Use arrows. A small loop arrow from Reviewer back to Coder labeled "feedback".
+Simple horizontal flow with three boxes: `Issue -> Coder -> Reviewer -> (approve | revise)`. Use arrows. A small loop arrow from Reviewer back to Coder labeled "feedback". Put the question in a highlighted box directly below the diagram.
 
 **Say:**
-Picture a junior engineer and a senior engineer working on a bug. Junior writes a fix, senior reviews, they iterate. That's exactly how two AI helpers work too. The interesting question: can we use the transcripts of those conversations to make both AIs better over time?
+Picture a junior engineer and a senior engineer working on a bug. Junior writes a fix, senior reviews, they iterate. That's exactly how two AI helpers work today. Interesting question: can we use those transcripts to make both AIs better over time?
 
 ---
 
@@ -113,15 +116,23 @@ Every time the two AIs talk, we save the whole conversation to a file. We call i
 
 ---
 
-## Slide 6. The system in one picture
+## Slide 6. What we built: five pieces
 
-**On slide:** *(no bullets, diagram only)*
+**On slide:**
+
+| Piece | What it does |
+|---|---|
+| **Oracle** | Runs the real tests. Hidden from the Reviewer. |
+| **Git history** | Shows both AIs past fixes from this repo. |
+| **Two notebooks** | Coder stores lessons. Reviewer stores calibration cases. |
+| **Distillation** | Updates the notebooks after each bug. |
+| **Safety rails** | Held-out bugs, alternating updates, freeze rules. |
 
 **Visual:**
-The architecture diagram from `docs/DESIGN.md`. Screenshot the mermaid graph. Highlight with a red box or arrow the **"HIDDEN from reviewer"** edge from Oracle to Trace Store, and add a callout: "this is the one thing neither AI can fool".
+No arrows or flowchart. Just the table above, rendered as 5 stacked rows with the left column bold. Optionally prefix each row with a small icon (test tube, branch, notebook, funnel, shield). Keep it scannable in 10 seconds.
 
 **Say:**
-Five pieces. An Oracle that runs real pytest tests and is the one thing nobody can fool. A git-history retrieval that shows both agents similar past fixes from this repo. A small notebook for each agent with distilled lessons. A distillation step that fills those notebooks after each issue. And safety rails on top.
+Five pieces, five rows. An Oracle runs the real tests and is the one thing nobody can fool. The git-history retrieval lets both AIs see how similar fixes looked in this repo before. Each AI has a small notebook with distilled lessons. Distillation fills those notebooks after every issue. And safety rails on top prevent bad dynamics.
 
 ---
 
@@ -129,15 +140,16 @@ Five pieces. An Oracle that runs real pytest tests and is the one thing nobody c
 
 **On slide:**
 
-- Runs real pytest tests on every fix.
+- Runs the real pytest tests on every fix.
 - Result is **hidden from the Reviewer**.
-- Can't be fooled by a fast-talking AI.
+- Otherwise the Reviewer would just copy the Oracle's answer.
+- So we keep the Reviewer blind and compare its guess against the Oracle afterward.
 
 **Visual:**
-Three boxes: the Coder's fix goes to both the Reviewer (left) and the Oracle (right). Over the Oracle, draw a lock icon. Label: "hidden from reviewer". The Reviewer outputs "approve/reject", the Oracle outputs "pass/fail".
+Three boxes: the Coder's fix goes to both the Reviewer (left) and the Oracle (right). Over the Oracle, draw a lock icon pointing at the arrow going TO the Reviewer (the locked path is Oracle → Reviewer, that's the one that's blocked). The Reviewer outputs "approve/reject", the Oracle outputs "pass/fail".
 
 **Say:**
-This is the single most important piece. Tests don't lie. They just run and pass or fail. We hide their result from the Reviewer on purpose. We want the Reviewer to have its own opinion, and then we compare that opinion to the Oracle afterward.
+The single most important piece. Tests don't lie. They just run and pass or fail. We hide their result from the Reviewer on purpose. If the Reviewer could see the Oracle's answer, it would just copy it and we'd learn nothing about its judgment. We want the Reviewer to have its own opinion, then we compare.
 
 ---
 
@@ -165,16 +177,18 @@ Standard ablation study. Two versions of the system. One has all the features tu
 
 **On slide:**
 
-- `test_pass_rate`: did it actually work? (headline)
-- `reviewer_precision`: when the Reviewer says yes, is it right?
-- `reviewer_recall`: does the Reviewer recognize good code?
-- `balance_gap`: do the two AIs quietly agree on something wrong?
+| Metric | Plain English |
+|---|---|
+| **test_pass_rate** | Did the code actually work? (headline) |
+| **precision** | When the Reviewer says yes, is it right? |
+| **recall** | Does the Reviewer notice good code? |
+| **balance_gap** | Do Reviewer and tests disagree a lot? |
 
 **Visual:**
-Dashboard mockup. One big number on the left (test_pass_rate, like "100%"). Four smaller boxes on the right with mini labels (precision, recall, fpr, balance_gap). Use green/red fill to show "good" vs "bad" ranges.
+Dashboard mockup. One big number on the left (test_pass_rate, like "100%"). Four smaller boxes on the right with these exact labels and plain-English glosses under each. Use green/red fill for good vs bad ranges.
 
 **Say:**
-The headline metric is oracle-grounded. The reviewer can't inflate it. The three smaller ones let us blame the right AI when something goes wrong. The last one is a watchdog for the "two AIs agree on nonsense" failure.
+The headline is oracle-grounded so the AIs can't inflate it. Precision and recall are how we measure whether the Reviewer is any good, in plain terms. The last one is our watchdog for the two AIs quietly agreeing on something wrong.
 
 ---
 
@@ -236,17 +250,20 @@ The first run was mostly about finding bugs in my own system, not bugs in arrow.
 
 - Both arms: 100% bugs fixed.
 - FULL slightly faster (1.2 rounds vs 1.4).
-- But look at reviewer recall.
+- **Recall is only ~50% in both.**
+- (recall = does the Reviewer notice good code)
 
 **Visual:**
 Grouped bar chart. X-axis: 4 metrics (`test_pass_rate`, `rounds_to_pass`, `precision`, `recall`). Y-axis: value. Two bars per metric: FULL (blue) and ABLATE (gray).
 - `test_pass_rate`: both 100%
 - `rounds_to_pass`: 1.2 vs 1.4
 - `precision`: both 100%
-- **`recall`: 50% vs 57%, both short.** Highlight this column.
+- **`recall`: 50% vs 57%, both short.** Red callout pointing at this column.
+
+Add a small legend below the chart with the plain-English gloss: "recall = of the correct fixes, how many did the Reviewer approve?"
 
 **Say:**
-Phase B was the real measurement. On the headline, both arms fixed all 5 bugs. Looked boring. But the per-agent breakdown told a different story. Reviewer recall was only around half. Half the time the Coder wrote code that actually passed tests, the Reviewer rejected it anyway. That's a big finding the headline alone would have hidden.
+Phase B was the real measurement. Both arms fixed all 5 bugs, looked boring. But the per-agent breakdown told a different story. Reviewer recall was only around half. Half the time the Coder wrote code that actually passed tests, the Reviewer rejected it anyway. That's a big finding the headline alone would have hidden.
 
 ---
 
@@ -275,20 +292,21 @@ This is the clearest example of the problem. The Coder wrote a fix. The Oracle s
 **On slide:**
 
 - **7 of 15 rounds: good fix, rejected anyway.**
-- Precision 100%, recall 50%.
+- The Reviewer was correct when it approved (precision 100%).
+- But it missed half the correct fixes (recall 50%).
 
 **Visual:**
-A 2x2 confusion matrix:
+A 2x2 confusion matrix with plain-English labels, not just the metric names:
 
-|  | **Tests PASS** | **Tests FAIL** |
+|  | **Tests said PASS** | **Tests said FAIL** |
 |---|---|---|
-| **Reviewer approves** | 5 (true approval) | 0 |
-| **Reviewer rejects** | **7 (false rejection, BIG)** | 3 (true rejection) |
+| **Reviewer approved** | 5 | 0 |
+| **Reviewer rejected** | **7** | 3 |
 
-Highlight the 7 in red. Big label next to it: "the problem".
+Label the 7 with a red callout: "rejected good fixes". Label the 5 with a small green check: "correctly approved". Under the matrix, one line: "Reviewer never approved bad code (good), but rejected half the good code (problem)."
 
 **Say:**
-So the Reviewer is too picky. Not lazy, not dishonest. Nitpicky. It kept asking for more tests even when the fix worked. Interestingly, the real arrow fixes usually include tests too, so the Reviewer's instinct was reasonable. The problem was the Coder wasn't meeting it.
+The Reviewer is too picky. Not lazy, not dishonest. Nitpicky. It kept asking for more tests even when the fix worked. Interestingly, the real arrow fixes usually include tests too, so the Reviewer's instinct was reasonable. The problem was the Coder wasn't meeting it.
 
 ---
 
@@ -316,9 +334,11 @@ Instead of telling the Reviewer "approve without tests" (wrong layer), I changed
 
 **On slide:**
 
-- Sequential run, memory accumulates across issues.
-- Memory helped. **But test_pass_rate dropped to 50%.**
-- The Coder writes tests that fail on its own fix.
+- Sequential run. Memory accumulates across bugs.
+- Good news: memory actually helped. Reviewer recalibrated.
+- **Bad news: test_pass_rate dropped to 50%.**
+- Why: the Coder now writes tests. Sometimes they fail on its own fix. Reviewer can't tell (it doesn't run code).
+- The metrics pipeline caught this without us looking for it.
 
 **Visual:**
 Headline chart. Line showing `test_pass_rate` over the four phases:
@@ -326,10 +346,10 @@ Headline chart. Line showing `test_pass_rate` over the four phases:
 - Phase B: 100%
 - Phase C: 100%
 - Phase D: **50%** (drop)
-Next to the Phase D point, a caption: "Coder tests its own homework".
+Big red arrow annotating the Phase D drop with the caption: **"Coder writes broken tests. Reviewer approves anyway because it doesn't run code."**
 
 **Say:**
-Phase D was the most interesting result because it made things worse. For the first time I ran sequentially, so memory could accumulate. Memory did help the Reviewer calibrate. But writing tests opened a new hole: sometimes the Coder writes a broken test. The Oracle catches the failing test, but the Reviewer, which doesn't actually run code, approves anyway. Classic "coder tests its own homework". The metric pipeline caught it without me looking for it, which is the whole point.
+Phase D was the most interesting result because it made things worse. Memory accumulated across issues and did help the Reviewer calibrate. But now that the Coder writes tests, sometimes it writes a broken test. The Oracle catches the failing test. The Reviewer, which reads the diff but doesn't actually run code, approves anyway. Classic "coder tests its own homework". And the metric pipeline caught it without me looking for it, which is the whole point of having the watchdog alerts.
 
 ---
 
