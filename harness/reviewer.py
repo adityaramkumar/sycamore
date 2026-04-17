@@ -1,8 +1,8 @@
 """
 reviewer.py: Code diff reviewer using claude-agent-sdk.
 
-Uses ClaudeSDKClient with a custom submit_review MCP tool to get a structured
-approval decision from Claude.
+Uses ClaudeSDKClient with a custom submit_review MCP tool to get a
+structured approval decision from Claude.
 
 Auth: uses the system `claude` CLI (logged in via Claude Max on this machine).
 No ANTHROPIC_API_KEY needed.
@@ -25,27 +25,57 @@ from claude_agent_sdk import (
 
 _CLAUDE_BIN = os.environ.get("CLI_PATH") or shutil.which("claude") or None
 
+# Phase B showed the reviewer chronically over-asks: precision 100%,
+# recall 50-57%, with every rejection being of an oracle-passing diff.
+# The old prompt listed "correctness, edge cases, test coverage, code
+# style" with equal weight, which primed the model to reject any
+# correct fix that lacked new tests. This rewrite makes correctness
+# the primary criterion and explicitly tells the reviewer not to reject
+# for missing tests when the fix itself is right.
 SYSTEM_BASE = (
-    "You are a strict code reviewer. Given a GitHub issue and a diff, decide whether "
-    "the fix correctly addresses the issue. Check for: correctness, edge cases, test "
-    "coverage, and code style. Call submit_review with your decision."
+    "You are a code reviewer. Given a GitHub issue and a diff, decide "
+    "whether the fix correctly addresses the issue.\n\n"
+    "PRIMARY CRITERION: correctness. Does the diff actually make the "
+    "bug go away? If yes, lean toward approve.\n\n"
+    "Secondary considerations (mention in comments but do NOT block "
+    "approval on these alone):\n"
+    "- edge cases the fix might miss\n"
+    "- consistency with the repo's existing style and patterns\n"
+    "- risk of regressions in adjacent code\n\n"
+    "TEST COVERAGE: do NOT reject a correct fix just for missing new "
+    "tests. Many valid bug fixes in this repo ship without new tests. "
+    "You may note that tests would be nice-to-have in your comments, "
+    "but if the fix is small, correct, and consistent with the repo's "
+    "patterns, approve it.\n\n"
+    "Call submit_review with your decision."
 )
 
 
-def _build_system_prompt(memory_block: str = "") -> str:
-    """Compose the reviewer system prompt, optionally with a calibration
-    block (win/loss exemplars) appended.
+def _build_system_prompt(memory_block: str = "", history_block: str = "") -> str:
+    """Compose the reviewer system prompt.
+
+    Blocks are appended in order: base rubric, then calibration memory
+    (past wins and losses vs the oracle), then git-history context
+    (what past similar fixes in this repo looked like).
     """
-    if not memory_block:
-        return SYSTEM_BASE
-    return f"{SYSTEM_BASE}\n\n{memory_block}"
+    parts = [SYSTEM_BASE]
+    if memory_block:
+        parts.append(memory_block)
+    if history_block:
+        parts.append(history_block)
+    return "\n\n".join(parts)
 
 
 def _log(msg: str):
     print(f"    [reviewer] {msg}", flush=True)
 
 
-async def _run_reviewer_async(issue: dict, diff: str, memory_block: str = "") -> dict:
+async def _run_reviewer_async(
+    issue: dict,
+    diff: str,
+    memory_block: str = "",
+    history_block: str = "",
+) -> dict:
     if not diff.strip():
         _log("No diff to review, rejecting.")
         return {"approved": False, "comments": ["No changes were made."]}
@@ -90,7 +120,7 @@ async def _run_reviewer_async(issue: dict, diff: str, memory_block: str = "") ->
 
     options = ClaudeAgentOptions(
         model=model,
-        system_prompt=_build_system_prompt(memory_block),
+        system_prompt=_build_system_prompt(memory_block, history_block),
         max_turns=5,
         allowed_tools=["mcp__review-tools__submit_review"],
         permission_mode="default",
@@ -120,12 +150,21 @@ async def _run_reviewer_async(issue: dict, diff: str, memory_block: str = "") ->
     return review_result
 
 
-def run_reviewer(issue: dict, diff: str, memory_block: str = "") -> dict:
+def run_reviewer(
+    issue: dict,
+    diff: str,
+    memory_block: str = "",
+    history_block: str = "",
+) -> dict:
     """
     Review a diff for a given issue.
     Returns {"approved": bool, "comments": [str, ...]}.
 
-    `memory_block` is an optional calibration preamble (win/loss
-    exemplars) injected into the system prompt by the loop layer.
+    `memory_block`  optional calibration preamble (win/loss exemplars).
+    `history_block` optional git-history context: up to 3 pre-baseline
+                    commits that touched the same files. Tells the
+                    reviewer what a typical fix in this repo looks
+                    like, so it does not over-ask relative to the
+                    repo's own patterns.
     """
-    return anyio.run(_run_reviewer_async, issue, diff, memory_block)
+    return anyio.run(_run_reviewer_async, issue, diff, memory_block, history_block)

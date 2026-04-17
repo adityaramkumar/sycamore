@@ -266,7 +266,11 @@ def run_issue(
         )
 
         print(f"  [Round {round_num}] Running reviewer... ({len(diff)} chars in diff)", flush=True)
-        review = run_reviewer(issue, diff, memory_block=reviewer_block)
+        review = run_reviewer(
+            issue, diff,
+            memory_block=reviewer_block,
+            history_block=history_block,
+        )
 
         trace["rounds"] = round_num
         trace["comments_per_round"].append({
