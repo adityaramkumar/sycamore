@@ -19,15 +19,17 @@ import time
 
 try:
     from harness.coder import run_coder
-    from harness.reviewer import run_reviewer
-    from harness.oracle import run as run_oracle
-    from harness.memory import CoderMemory, ReviewerMemory, categorize
     from harness.distill import update_from_trace
     from harness.history import (
         render_block as render_history_block,
+    )
+    from harness.history import (
         retrieve_similar_fixes,
         retrieved_sha_list,
     )
+    from harness.memory import CoderMemory, ReviewerMemory, categorize
+    from harness.oracle import run as run_oracle
+    from harness.reviewer import run_reviewer
     from harness.scheduler import (
         DEFAULT_HELDOUT_SIZE,
         DEFAULT_SEED,
@@ -37,15 +39,17 @@ try:
     )
 except ImportError:
     from coder import run_coder  # type: ignore
-    from reviewer import run_reviewer  # type: ignore
-    from oracle import run as run_oracle  # type: ignore
-    from memory import CoderMemory, ReviewerMemory, categorize  # type: ignore
     from distill import update_from_trace  # type: ignore
     from history import (  # type: ignore
         render_block as render_history_block,
+    )
+    from history import (
         retrieve_similar_fixes,
         retrieved_sha_list,
     )
+    from memory import CoderMemory, ReviewerMemory, categorize  # type: ignore
+    from oracle import run as run_oracle  # type: ignore
+    from reviewer import run_reviewer  # type: ignore
     from scheduler import (  # type: ignore
         DEFAULT_HELDOUT_SIZE,
         DEFAULT_SEED,
@@ -352,7 +356,7 @@ def save_trace(trace: dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run worktrial loop")
+    parser = argparse.ArgumentParser(description="Run the sycamore coder-reviewer optimization loop")
     parser.add_argument("--issue", type=int, help="Run a single issue by number")
     parser.add_argument(
         "--issues",

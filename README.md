@@ -1,17 +1,17 @@
 # Co-Optimizing AI Coding and Review Agents
 
-A prototype that uses the interaction traces between an AI coding agent
+[![CI](https://github.com/adityaramkumar/sycamore/actions/workflows/ci.yml/badge.svg)](https://github.com/adityaramkumar/sycamore/actions/workflows/ci.yml)
+
+A system that uses the interaction traces between an AI coding agent
 and an AI review agent to improve both over time, with guardrails
 against the usual self-play pathologies. Built against [arrow-py/arrow]'s
-real historical bug backlog (about 800 pre-baseline commits, 25 curated
+real historical bug backlog (~800 pre-baseline commits, 25 curated
 post-baseline fixes pinned to commit `c9cecaf`).
 
 **New here? Start with [docs/OVERVIEW.md](docs/OVERVIEW.md).** It's a
 plain-language walkthrough of what this project does and what we found.
 
-The three-part worktrial prompt is in [docs/PROBLEM.md](docs/PROBLEM.md).
-A direct point-by-point response lives in [docs/RESPONSE.md](docs/RESPONSE.md).
-Design writeup in [docs/DESIGN.md](docs/DESIGN.md), results in
+Technical design in [docs/DESIGN.md](docs/DESIGN.md), results in
 [docs/RESULTS.md](docs/RESULTS.md).
 
 [arrow-py/arrow]: https://github.com/arrow-py/arrow
@@ -59,6 +59,9 @@ python harness/eval.py ./traces
 
 # Ablation baseline (no memory, no history retrieval)
 python -m harness.loop --all --ablate --no-history
+
+# Run unit tests
+pytest tests/
 ```
 
 Environment variables are documented in [.env.example](.env.example).
@@ -70,28 +73,30 @@ Parallel ablation runs are wrapped in
 ```
 sycamore/
 ├── README.md                 you are here
+├── CLAUDE.md                 codebase guide for contributors
 ├── requirements.txt
 ├── .env.example              env-var reference
 ├── data/
 │   └── issues.json           25 curated bugs, fix ground truth, baseline SHA
 ├── docs/
 │   ├── OVERVIEW.md           plain-language walkthrough, start here
-│   ├── PROBLEM.md            the worktrial prompt
+│   ├── PROBLEM.md            the original design specification
 │   ├── RESPONSE.md           direct point-by-point response to PROBLEM.md
 │   ├── DESIGN.md             system design (technical)
-│   ├── RESULTS.md            Phase A/B/C results and failure-mode analysis
+│   ├── RESULTS.md            Phase A/B/C/D results and failure-mode analysis
 │   └── PRESENTATION.md       slide-by-slide deck with speaker notes
-├── harness/                  the code
-│   ├── loop.py               orchestrator and CLI
-│   ├── coder.py              coder agent (Claude with Read/Edit/Bash/submit_fix)
-│   ├── reviewer.py           reviewer agent (Claude with submit_review)
-│   ├── oracle.py             targeted pytest runner plus broader regression check
+├── harness/                  the implementation
+│   ├── loop.py               orchestrator and CLI entry-point
+│   ├── coder.py              coder agent (Read/Edit/Bash + submit_fix tool)
+│   ├── reviewer.py           reviewer agent (submit_review tool)
+│   ├── oracle.py             targeted pytest runner + broader regression check
 │   ├── memory.py             JSON-backed capped bullet stores for both agents
 │   ├── history.py            baseline-scoped git-log retrieval for the coder
 │   ├── distill.py            trace mining into memory updates (2x2 win/loss)
 │   ├── scheduler.py          held-out split, alternating updates, audit/freeze
 │   ├── metrics.py            oracle-grounded scoreboard and balance monitor
 │   └── eval.py               thin CLI wrapper over metrics
+├── tests/                    unit tests (pytest)
 └── scripts/
     └── run_parallel_ablation.sh
 ```

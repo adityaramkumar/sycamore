@@ -40,7 +40,7 @@ per bug.
 ## The problem we were asked to solve
 
 Today's AI coder and AI reviewer are trained separately. They don't
-learn from each other. The worktrial prompt asked: can we use the
+learn from each other. The original design spec asked: can we use the
 traces above to teach both of them to be better, without the bad
 stuff happening?
 
@@ -168,8 +168,8 @@ problem). The system is honest about itself, which is the point.
 - [DESIGN.md](DESIGN.md): how the pieces fit together, what we
   borrowed from GANs and AlphaGo, and why we made the choices we did.
 - [RESPONSE.md](RESPONSE.md): direct answer to each question in the
-  original worktrial prompt.
+  original design specification.
 - [RESULTS.md](RESULTS.md): all the actual measurements from the
   real runs, plus honest caveats about what the numbers do and don't
   show.
-- [PROBLEM.md](PROBLEM.md): the original worktrial prompt.
+- [PROBLEM.md](PROBLEM.md): the original design specification.

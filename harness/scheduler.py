@@ -29,13 +29,18 @@ Three responsibilities:
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import random
+from dataclasses import dataclass, field
 
 try:
     from harness.metrics import IssueOutcome, _flatten, _reviewer_confusion, _safe_div
 except ImportError:
-    from metrics import IssueOutcome, _flatten, _reviewer_confusion, _safe_div  # type: ignore
+    from metrics import (  # type: ignore
+        IssueOutcome,
+        _flatten,
+        _reviewer_confusion,
+        _safe_div,
+    )
 
 DEFAULT_HELDOUT_SIZE = 7
 DEFAULT_SEED = 42

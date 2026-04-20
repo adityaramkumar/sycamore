@@ -7,20 +7,20 @@ structured approval decision from Claude.
 Auth: uses the system `claude` CLI (logged in via Claude Max on this machine).
 No ANTHROPIC_API_KEY needed.
 """
-import anyio
 import os
 import shutil
 import time
 
+import anyio
 from claude_agent_sdk import (
+    AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
-    AssistantMessage,
     ResultMessage,
     TextBlock,
     ToolUseBlock,
-    tool,
     create_sdk_mcp_server,
+    tool,
 )
 
 _CLAUDE_BIN = os.environ.get("CLI_PATH") or shutil.which("claude") or None

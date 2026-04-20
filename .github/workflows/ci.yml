@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    name: Unit tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          # Install core runtime dependencies (skip oracle extras that need
+          # a working arrow clone — unit tests don't exercise those paths)
+          pip install anyio pytest
+          # Install the SDK stub so module-level imports resolve in tests
+          pip install claude-agent-sdk || true
+
+      - name: Run unit tests
+        run: pytest tests/ -v --tb=short
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Lint with ruff
+        run: |
+          ruff check harness/ tests/ \
+            --select E,W,F,I \
+            --ignore E501 \
+            --per-file-ignores "harness/loop.py:E402,harness/distill.py:E402,harness/scheduler.py:E402,tests/test_distill.py:E402"

@@ -39,7 +39,6 @@ try:
     from harness.memory import (
         CoderMemory,
         ReviewerMemory,
-        REVIEWER_OUTCOMES,
         categorize,
         make_item,
     )
@@ -47,7 +46,6 @@ except ImportError:
     from memory import (  # type: ignore
         CoderMemory,
         ReviewerMemory,
-        REVIEWER_OUTCOMES,
         categorize,
         make_item,
     )

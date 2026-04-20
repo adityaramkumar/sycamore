@@ -18,9 +18,9 @@ the way distillation will sample reviewer calibration cases.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import json
 import os
+from dataclasses import dataclass, field
 from typing import Iterable
 
 

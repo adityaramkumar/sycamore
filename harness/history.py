@@ -25,10 +25,10 @@ No LLM calls. Pure git + string. ~100ms per issue.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import os
 import re
 import subprocess
+from dataclasses import dataclass, field
 
 DEFAULT_K = 3
 MAX_DIFF_EXCERPT_CHARS = 1500

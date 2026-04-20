@@ -8,22 +8,21 @@ MCP tool signals when the agent is satisfied with its changes.
 Auth: uses the system `claude` CLI (logged in via Claude Max on this machine).
 No ANTHROPIC_API_KEY needed; set CLI_PATH env var to override the binary path.
 """
-import anyio
 import os
 import shutil
 import subprocess
-import sys
 import time
 
+import anyio
 from claude_agent_sdk import (
+    AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
-    AssistantMessage,
     ResultMessage,
     TextBlock,
     ToolUseBlock,
-    tool,
     create_sdk_mcp_server,
+    tool,
 )
 
 REPO = os.environ.get("TARGET_REPO_PATH", "./arrow")
@@ -129,7 +128,7 @@ async def _run_coder_async(
         return {"content": [{"type": "text", "text": "Fix submitted. Thank you."}]}
 
     mcp_server = create_sdk_mcp_server(
-        name="worktrial-tools",
+        name="coder-tools",
         version="1.0.0",
         tools=[submit_fix],
     )
@@ -152,9 +151,9 @@ async def _run_coder_async(
         ),
         cwd=os.path.abspath(REPO),
         max_turns=max_turns,
-        allowed_tools=["Read", "Write", "Edit", "Bash", "mcp__worktrial-tools__submit_fix"],
+        allowed_tools=["Read", "Write", "Edit", "Bash", "mcp__coder-tools__submit_fix"],
         permission_mode="acceptEdits",
-        mcp_servers={"worktrial-tools": mcp_server},
+        mcp_servers={"coder-tools": mcp_server},
         **({"cli_path": _CLAUDE_BIN} if _CLAUDE_BIN else {}),
     )
 
