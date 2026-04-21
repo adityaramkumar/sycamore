@@ -1,10 +1,10 @@
-# Response to the Worktrial Prompt
+# Response to the Design Specification
 
 Direct point-by-point response to [PROBLEM.md](PROBLEM.md). This doc is
-deliberately short. The substantive content lives in
-[DESIGN.md](DESIGN.md) and [RESULTS.md](RESULTS.md). What you get here
-is every question PROBLEM.md asks, with a concise answer and a pointer
-to where the detail lives.
+deliberately short — the substantive content lives in
+[DESIGN.md](DESIGN.md) and [RESULTS.md](RESULTS.md). Each question
+from the design spec is answered concisely with a pointer to where
+the detail lives.
 
 ---
 

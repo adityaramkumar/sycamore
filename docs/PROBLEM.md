@@ -96,7 +96,7 @@ Your prototype should:
 
 ## Time Budget
 
-This is a full-day worktrial (~8-9 hours). Suggested breakdown:
+Suggested time breakdown (~8-9 hours total):
 
 | Phase | Time | Description |
 |-------|------|-------------|

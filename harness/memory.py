@@ -26,12 +26,12 @@ work (DESIGN.md sec 9).
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import json
 import os
 import threading
 import time
 import uuid
+from dataclasses import asdict, dataclass
 
 DEFAULT_PER_TAG_CAP = 8
 MEMORY_DIR = os.environ.get(

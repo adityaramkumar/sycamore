@@ -520,4 +520,4 @@ Useful to have on hand for Q&A.
 - `docs/OVERVIEW.md`: plain-language start-here doc.
 - `docs/DESIGN.md`: the technical design.
 - `docs/RESULTS.md`: Phase A, B, C, D writeups with all the numbers.
-- `docs/RESPONSE.md`: direct answer to the worktrial prompt.
+- `docs/RESPONSE.md`: direct answer to the original design specification.

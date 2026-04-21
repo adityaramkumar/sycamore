@@ -21,13 +21,13 @@ naming convention the source data used.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import json
 import os
 import re
 import subprocess
 import sys
 import time
+from dataclasses import asdict, dataclass, field
 
 REPO = os.environ.get("TARGET_REPO_PATH", "./arrow")
 DEFAULT_TIMEOUT_S = int(os.environ.get("ORACLE_TIMEOUT_S", "120"))
